@@ -1,17 +1,19 @@
-"""manual keypress agent"""
+"""Custom agent."""
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from rl.memory import SequentialMemory
 
+from agents import PlayerBase
 from agents.agent_keras_rl_dqn import TrumpPolicy, memory_limit, window_length
 from gym_env import env
 
 
-class Player:
-    """Mandatory class with the player methods"""
+class Player(PlayerBase):
+    """Mandatory class with the player methods."""
 
     def __init__(self, name='Custom_Q1'):
-        """Initiaization of an agent"""
+        """Initiaization of an agent."""
         self.equity_alive = 0
         self.actions = []
         self.last_action_in_stage = ''
@@ -21,7 +23,7 @@ class Player:
         self.model = None
 
     def initiate_agent(self, nb_actions):
-        """initiate a deep Q agent"""
+        """initiate a deep Q agent."""
 
         self.model = Sequential()
         self.model.add(Dense(512, activation='relu', input_shape=env.observation_space))  # pylint: disable=no-member

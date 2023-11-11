@@ -1,16 +1,16 @@
-"""Random player"""
+"""Random player."""
+
 import random
 
-from gym_env.env import Action
+from agents import PlayerBase
+from gym_env.env_jc import Action
 
-autplay = True  # play automatically if played against keras-rl
 
-
-class Player:
-    """Mandatory class with the player methods"""
+class Player(PlayerBase):
+    """Mandatory class with the player methods."""
 
     def __init__(self, name='Random'):
-        """Initiaization of an agent"""
+        """Initiaization of an agent."""
         self.equity_alive = 0
         self.actions = []
         self.last_action_in_stage = ''
@@ -23,8 +23,20 @@ class Player:
         _ = observation  # not using the observation for random decision
         _ = info
 
-        this_player_action_space = {Action.FOLD, Action.CHECK, Action.CALL, Action.RAISE_POT, Action.RAISE_HALF_POT,
-                                    Action.RAISE_2POT}
-        possible_moves = this_player_action_space.intersection(set(action_space))
-        action = random.choice(list(possible_moves))
+        this_player_action_space = [
+            Action.FOLD,
+            Action.CHECK,
+            Action.CALL,
+            Action.RAISE_POT,
+            Action.RAISE_HALF_POT,
+            Action.ALL_IN
+        ]
+
+        possible_moves = []
+        for action in this_player_action_space:
+            if action in action_space:
+                possible_moves.append(action)
+
+        action = random.choice(possible_moves)
+
         return action

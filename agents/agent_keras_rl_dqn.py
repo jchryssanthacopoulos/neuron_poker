@@ -1,24 +1,24 @@
-"""Player based on a trained neural network"""
+"""Player based on a trained neural network."""
+
 # pylint: disable=wrong-import-order
 import logging
+import json
 import time
 
 import numpy as np
-
-from gym_env.env import Action
-
+from rl.policy import BoltzmannQPolicy
+from rl.memory import SequentialMemory
+from rl.agents import DQNAgent
+from rl.core import Processor
 import tensorflow as tf
-import json
-
 from tensorflow.keras.models import Sequential, model_from_json
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
-from rl.policy import BoltzmannQPolicy
-from rl.memory import SequentialMemory
-from rl.agents import DQNAgent
-from rl.core import Processor
+from agents import PlayerBase
+from gym_env.env_jc import Action
+
 
 autoplay = True  # play automatically if played against keras-rl
 
@@ -34,11 +34,11 @@ enable_double_dqn = False
 log = logging.getLogger(__name__)
 
 
-class Player:
-    """Mandatory class with the player methods"""
+class Player(PlayerBase):
+    """Mandatory class with the player methods."""
 
     def __init__(self, name='DQN', load_model=None, env=None):
-        """Initiaization of an agent"""
+        """Initiaization of an agent."""
         self.equity_alive = 0
         self.actions = []
         self.last_action_in_stage = ''
@@ -54,7 +54,7 @@ class Player:
             self.load(load_model)
 
     def initiate_agent(self, env):
-        """initiate a deep Q agent"""
+        """initiate a deep Q agent."""
         tf.compat.v1.disable_eager_execution()
 
         self.env = env
@@ -62,7 +62,7 @@ class Player:
         nb_actions = self.env.action_space.n
 
         self.model = Sequential()
-        self.model.add(Dense(512, activation='relu', input_shape=env.observation_space))
+        self.model.add(Dense(512, activation='relu', input_shape=env.observation_space.shape))
         self.model.add(Dropout(0.2))
         self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(0.2))
@@ -91,7 +91,7 @@ class Player:
         return action
 
     def train(self, env_name):
-        """Train a model"""
+        """Train a model."""
         # initiate training loop
         timestr = time.strftime("%Y%m%d-%H%M%S") + "_" + str(env_name)
         tensorboard = TensorBoard(log_dir='./Graph/{}'.format(timestr), histogram_freq=0, write_graph=True,
@@ -157,8 +157,15 @@ class Player:
         _ = observation  # not using the observation for random decision
         _ = info
 
-        this_player_action_space = {Action.FOLD, Action.CHECK, Action.CALL, Action.RAISE_POT, Action.RAISE_HALF_POT,
-                                    Action.RAISE_2POT}
+        this_player_action_space = {
+            Action.FOLD,
+            Action.CHECK,
+            Action.CALL,
+            Action.RAISE_POT,
+            Action.RAISE_HALF_POT,
+            Action.ALL_IN
+        }
+
         _ = this_player_action_space.intersection(set(action_space))
 
         action = None
@@ -169,13 +176,14 @@ class TrumpPolicy(BoltzmannQPolicy):
     """Custom policy when making decision based on neural network."""
 
     def select_action(self, q_values):
-        """Return the selected action
+        """Return the selected action.
 
-        # Arguments
+        Arguments
             q_values (np.ndarray): List of the estimations of Q for each action
 
-        # Returns
+        Returns
             Selection action
+
         """
         assert q_values.ndim == 1
         q_values = q_values.astype('float64')
