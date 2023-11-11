@@ -168,7 +168,6 @@ class HoldemTable(Env):
         self.player_pots = None  # individual player pots
 
         self.observation = None
-        self.reward = None
         self.info = None
         self.done = False
         self.funds_history = None
@@ -177,6 +176,8 @@ class HoldemTable(Env):
         self.illegal_move_reward = -1
         self.action_space = Discrete(len(Action) - 2)
         self.first_action_for_hand = None
+
+        self.initiated_new_hand = False
 
         # add players to table, starting with the main player
         self.add_player(player)
@@ -194,8 +195,9 @@ class HoldemTable(Env):
         """Reset after game over."""
         super().reset(seed=seed)
 
+        log.info("Start of reset")
+
         self.observation = None
-        self.reward = None
         self.info = None
         self.done = False
         self.funds_history = pd.DataFrame()
@@ -220,6 +222,8 @@ class HoldemTable(Env):
         # this dictionary contains auxiliary information complementing observation
         info = {}
 
+        log.info("End of reset")
+
         return (self.array_everything, info)
 
     def step(self, action):  # pylint: disable=arguments-differ
@@ -229,30 +233,36 @@ class HoldemTable(Env):
             action: Used for testing only. Needs to be of Action type
 
         """
-        self.reward = 0
         self.acting_agent = self.player_cycle.idx
 
         log.info("Start of step")
         log.info(f"Action: {action}")
 
-        if not self._agent_is_autoplay():
-            # this is not an autoplay agent, meaning the action has to be used
-            self._get_environment()  # get legal moves
+        if self._agent_is_autoplay():
+            raise RuntimeError("Illegal action.")
 
-            if Action(action) not in self.legal_moves:
-                self._illegal_move(action)
-            else:
-                self._execute_step(Action(action))
-                if self.first_action_for_hand[self.acting_agent] or self.done:
-                    self.first_action_for_hand[self.acting_agent] = False
-                    self._calculate_reward(action)
+        # this is not an autoplay agent, meaning the action has to be used
+        self._get_environment()
 
-        # advance all the other autoplay players
-        self._advance_autoplay_players()
+        if Action(action) not in self.legal_moves:
+            log.warning(f"{action} is an Illegal move, try again. Currently allowed: {self.legal_moves}")
+            reward = self.illegal_move_reward
+        else:
+            self._execute_step(Action(action))
+            self._advance_autoplay_players()
+            reward = self._calculate_reward(action)
 
-        log.info("End of step")
+        # this implements a "fast fold", where next hand is dealt if main player
+        # folds. However, this interferes with the players' pots
+        # if self.player_cycle.folder[0]:
+        #     log.info("Main player fast folded, advancing to next table")
+        #     self.done = True
+        # else:
+        #     self._advance_autoplay_players()
 
-        return self.array_everything, self.reward, self.done, self.info
+        log.info(f"End of step. Reward = {reward}")
+
+        return self.array_everything, reward, self.done, self.info
 
     def _advance_autoplay_players(self):
         """Advance all autoplay players one round."""
@@ -263,10 +273,7 @@ class HoldemTable(Env):
             log.info("Autoplay agent. Call action method of agent.")
             action = self.current_player.agent_obj.action(self.legal_moves, self.observation, self.info)
 
-            if Action(action) not in self.legal_moves:
-                self._illegal_move(action)
-            else:
-                self._execute_step(Action(action))
+            self._execute_step(Action(action))
 
     def _execute_step(self, action):
         self._process_decision(action)
@@ -279,10 +286,6 @@ class HoldemTable(Env):
 
         self._get_environment()
 
-    def _illegal_move(self, action):
-        log.warning(f"{action} is an Illegal move, try again. Currently allowed: {self.legal_moves}")
-        self.reward = self.illegal_move_reward
-
     def _agent_is_autoplay(self, idx=None):
         if not idx:
             return hasattr(self.current_player.agent_obj, 'autoplay')
@@ -294,7 +297,6 @@ class HoldemTable(Env):
             self._get_legal_moves()
 
         self.observation = None
-        self.reward = 0
         self.info = None
 
         self.community_data = CommunityData(len(self.players))
@@ -342,24 +344,25 @@ class HoldemTable(Env):
 
         """
         # if last_action == Action.FOLD:
-        #     self.reward = -(
-        #             self.community_pot + self.current_round_pot)
+        #     reward = -(self.community_pot + self.current_round_pot)
         # else:
-        #     self.reward = self.player_data.equity_to_river_alive * (self.community_pot + self.current_round_pot) - \
-        #                   (1 - self.player_data.equity_to_river_alive) * self.player_pots[self.current_player.seat]
+        #     reward = self.player_data.equity_to_river_alive * (self.community_pot + self.current_round_pot) - \
+        #         (1 - self.player_data.equity_to_river_alive) * self.player_pots[self.current_player.seat]
 
         _ = last_action
+
         if self.done:
             won = 1 if not self._agent_is_autoplay(idx=self.winner_ix) else -1
-            self.reward = self.initial_stacks * len(self.players) * won
-            log.debug(f"Keras-rl agent has reward {self.reward}")
+            reward = self.initial_stacks * len(self.players) * won
+            log.debug(f"Keras-rl agent has reward {reward}")
+            return reward
 
-        elif len(self.funds_history) > 1:
-            self.reward = self.funds_history.iloc[-1, self.acting_agent] - self.funds_history.iloc[
-                -2, self.acting_agent]
+        if len(self.funds_history) > 1:
+            if self.initiated_new_hand:
+                self.initiated_new_hand = False
+                return self.funds_history.iloc[-1, 0] - self.funds_history.iloc[-2, 0]
 
-        else:
-            pass
+        return 0
 
     def _process_decision(self, action):  # pylint: disable=too-many-statements
         """Process the decisions that have been made by an agent."""
@@ -451,6 +454,8 @@ class HoldemTable(Env):
         log.info("++++++++++++++++++")
         log.info("Starting new hand.")
         log.info("++++++++++++++++++")
+
+        self.initiated_new_hand = True
         self.table_cards = []
         self._create_card_deck()
         self.stage = Stage.PREFLOP
@@ -485,12 +490,20 @@ class HoldemTable(Env):
         player_alive = []
         self.player_cycle.new_hand_reset()
 
+        log.info("Check game over")
+
         for idx, player in enumerate(self.players):
             if player.stack > 0:
                 player_alive.append(True)
             else:
                 self.player_status.append(False)
                 self.player_cycle.deactivate_player(idx)
+
+        if not self.player_cycle.can_still_make_moves_in_this_hand[0]:
+            # if main player cannot play, end round
+            log.info("Main player lost.")
+            self._game_over()
+            return True
 
         remaining_players = sum(player_alive)
         if remaining_players < 2:
@@ -682,7 +695,6 @@ class HoldemTable(Env):
     def _distribute_cards(self):
         log.info(f"Dealer is at position {self.dealer_pos}")
         for player in self.players:
-            # import pdb; pdb.set_trace()
             player.cards = []
             if player.stack <= 0:
                 continue
