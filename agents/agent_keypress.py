@@ -1,13 +1,14 @@
-"""manual keypress agent"""
+"""Manual keypress agent."""
 
-from gym_env.env import Action
+from agents import PlayerBase
+from gym_env.env_jc import Action
 
 
-class Player:
+class Player(PlayerBase):
     """Mandatory class with the player methods"""
 
     def __init__(self, name='Keypress'):
-        """Initiaization of an agent"""
+        """Initiaization of an agent."""
         self.equity_alive = 0
         self.actions = []
         self.last_action_in_stage = ''

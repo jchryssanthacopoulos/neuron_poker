@@ -184,20 +184,29 @@ class SelfPlay:
         from agents.agent_consider_equity import Player as EquityPlayer
         from agents.agent_keras_rl_dqn import Player as DQNPlayer
         from agents.agent_random import Player as RandomPlayer
+
         env_name = 'neuron_poker-v0'
-        env = gym.make(env_name, initial_stacks=self.stack, funds_plot=self.funds_plot, render=self.render,
-                       use_cpp_montecarlo=self.use_cpp_montecarlo)
+
+        player = PlayerShell(name='keras-rl', stack_size=self.stack)
+        bots = [
+            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
+            EquityPlayer(name='equity/20/30', min_call_equity=0.2, min_bet_equity=0.3),
+            RandomPlayer(),
+            RandomPlayer(),
+            RandomPlayer()
+        ]
+        env = gym.make(
+            env_name,
+            player=player,
+            bots=bots,
+            initial_stacks=self.stack,
+            funds_plot=self.funds_plot,
+            render=self.render,
+            use_cpp_montecarlo=self.use_cpp_montecarlo
+        )
 
         np.random.seed(123)
-        env.seed(123)
-        env.add_player(EquityPlayer(name='equity/50/70', min_call_equity=.5, min_bet_equity=.7))
-        env.add_player(EquityPlayer(name='equity/20/30', min_call_equity=.2, min_bet_equity=.3))
-        env.add_player(RandomPlayer())
-        env.add_player(RandomPlayer())
-        env.add_player(RandomPlayer())
-        env.add_player(PlayerShell(name='keras-rl', stack_size=self.stack))  # shell is used for callback to keras rl
-
-        env.reset()
+        env.reset(seed=123)
 
         dqn = DQNPlayer()
         dqn.initiate_agent(env)

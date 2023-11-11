@@ -1,15 +1,16 @@
-"""Random player"""
+"""Player based on equity."""
 
-from gym_env.env import Action
+from agents import PlayerBase
+from gym_env.env_jc import Action
 
 autoplay = True  # play automatically if played against keras-rl
 
 
-class Player:
-    """Mandatory class with the player methods"""
+class Player(PlayerBase):
+    """Mandatory class with the player methods."""
 
     def __init__(self, name='Random', min_call_equity=None, min_bet_equity=None):
-        """Initiaization of an agent"""
+        """Initiaization of an agent."""
         self.equity_alive = 0
         self.name = name
 
@@ -28,9 +29,6 @@ class Player:
 
         if equity_alive > self.min_bet_equity + increment2 and Action.ALL_IN in action_space:
             action = Action.ALL_IN
-
-        elif equity_alive > self.min_bet_equity + incremen1 and Action.RAISE_2POT in action_space:
-            action = Action.RAISE_2POT
 
         elif equity_alive > self.min_bet_equity and Action.RAISE_POT in action_space:
             action = Action.RAISE_POT
