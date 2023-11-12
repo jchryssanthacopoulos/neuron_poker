@@ -118,6 +118,7 @@ class HoldemTable(Env):
         self.observation = None
         self.info = None
         self.done = False
+        self.early_stop = False
         self.funds_history = None
         self.legal_moves = None
         self.illegal_move_reward = -100
@@ -125,7 +126,8 @@ class HoldemTable(Env):
         self.first_action_for_hand = None
 
         self.initiated_new_hand = False
-        self.num_hands = 0
+        self.num_hands_session = 0
+        self.total_num_hands = 0
         self.max_num_of_hands = 100
         self.time_in_hand = None
 
@@ -148,6 +150,7 @@ class HoldemTable(Env):
         self.observation = None
         self.info = None
         self.done = False
+        self.early_stop = False
         self.funds_history = pd.DataFrame()
         self.first_action_for_hand = [True] * len(self.players)
 
@@ -292,13 +295,13 @@ class HoldemTable(Env):
 
         _ = last_action
 
-        if self.done:
+        if self.done and not self.early_stop:
             won = 1 if not self._agent_is_autoplay(idx=self.winner_ix) else -1
             reward = self.initial_stacks * len(self.players) * won
             log.debug(f"Keras-rl agent has reward {reward}")
             return reward
 
-        if len(self.funds_history) > 1 and self.initiated_new_hand:
+        if len(self.funds_history) > 1 and (self.initiated_new_hand or self.early_stop):
             self.initiated_new_hand = False
             return self.funds_history.iloc[-1, 0] - self.funds_history.iloc[-2, 0]
 
@@ -395,12 +398,13 @@ class HoldemTable(Env):
 
         log.info("")
         log.info("++++++++++++++++++")
-        log.info(f"Starting hand {self.num_hands + 1}")
+        log.info(f"Starting hand {self.total_num_hands + 1}")
         log.info("++++++++++++++++++")
 
         self.time_in_hand = time.time()
+        self.num_hands_session += 1
+        self.total_num_hands += 1
         self.initiated_new_hand = True
-        self.num_hands += 1
         self.table_cards = []
         self._create_card_deck()
         self.stage = Stage.PREFLOP
@@ -450,10 +454,11 @@ class HoldemTable(Env):
             self._game_over()
             return True
 
-        # if (self.num_hands + 1) % self.max_num_of_hands == 0:
-        #     log.info("Maximum number of hands reached.")
-        #     self._game_over()
-        #     return True
+        if self.num_hands_session and self.num_hands_session % self.max_num_of_hands == 0:
+            log.info("Maximum number of hands reached in session.")
+            self.early_stop = True
+            self._game_over()
+            return True
 
         remaining_players = sum(player_alive)
         if remaining_players < 2:
@@ -464,6 +469,7 @@ class HoldemTable(Env):
     def _game_over(self):
         """End of an episode."""
         log.info("Game over.")
+        self.num_hands_session = 0
         self.done = True
         player_names = [f"{i} - {player.name}" for i, player in enumerate(self.players)]
         self.funds_history.columns = player_names
