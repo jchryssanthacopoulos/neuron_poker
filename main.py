@@ -80,7 +80,6 @@ def command_line_parser():
         elif args['dqn_play']:
             runner.dqn_play_keras_rl(model_name)
 
-
     else:
         raise RuntimeError("Argument not yet implemented")
 
@@ -213,20 +212,32 @@ class SelfPlay:
         dqn.train(env_name=model_name)
 
     def dqn_play_keras_rl(self, model_name):
-        """Create 6 players, one of them a trained DQN"""
+        """Create 6 players, one of them a trained DQN."""
         from agents.agent_consider_equity import Player as EquityPlayer
         from agents.agent_keras_rl_dqn import Player as DQNPlayer
         from agents.agent_random import Player as RandomPlayer
-        env_name = 'neuron_poker-v0'
-        self.env = gym.make(env_name, initial_stacks=self.stack, render=self.render)
-        self.env.add_player(EquityPlayer(name='equity/50/50', min_call_equity=.5, min_bet_equity=.5))
-        self.env.add_player(EquityPlayer(name='equity/50/80', min_call_equity=.8, min_bet_equity=.8))
-        self.env.add_player(EquityPlayer(name='equity/70/70', min_call_equity=.7, min_bet_equity=.7))
-        self.env.add_player(EquityPlayer(name='equity/20/30', min_call_equity=.2, min_bet_equity=.3))
-        self.env.add_player(RandomPlayer())
-        self.env.add_player(PlayerShell(name='keras-rl', stack_size=self.stack))
 
-        self.env.reset()
+        env_name = 'neuron_poker-v0'
+
+        player = PlayerShell(name='keras-rl', stack_size=self.stack)
+        bots = [
+            EquityPlayer(name='equity/50/50', min_call_equity=0.5, min_bet_equity=0.7),
+            EquityPlayer(name='equity/50/80', min_call_equity=0.2, min_bet_equity=0.3),
+            EquityPlayer(name='equity/70/70', min_call_equity=0.7, min_bet_equity=0.7),
+            EquityPlayer(name='equity/20/30', min_call_equity=0.2, min_bet_equity=0.3),
+            RandomPlayer()
+        ]
+        self.env = gym.make(
+            env_name,
+            player=player,
+            bots=bots,
+            initial_stacks=self.stack,
+            render=self.render,
+            use_cpp_montecarlo=self.use_cpp_montecarlo
+        )
+
+        np.random.seed(123)
+        self.env.reset(seed=123)
 
         dqn = DQNPlayer(load_model=model_name, env=self.env)
         dqn.play(nb_episodes=self.num_episodes, render=self.render)

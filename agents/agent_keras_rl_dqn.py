@@ -23,11 +23,11 @@ from gym_env.env_jc import Action
 autoplay = True  # play automatically if played against keras-rl
 
 window_length = 1
-nb_max_start_steps = 1  # random action
+nb_max_start_steps = 1000  # random action
 train_interval = 100  # train every 100 steps
 nb_steps_warmup = 50  # before training starts, should be higher than start steps
 nb_steps = 100000
-memory_limit = int(nb_steps / 2)
+memory_limit = int(nb_steps / 5)
 batch_size = 500  # items sampled from memory to train
 enable_double_dqn = False
 
@@ -102,11 +102,11 @@ class Player(PlayerBase):
 
         # Save the architecture
         dqn_json = self.model.to_json()
-        with open("dqn_{}_json.json".format(env_name), "w") as json_file:
+        with open("models/dqn_{}_json.json".format(env_name), "w") as json_file:
             json.dump(dqn_json, json_file)
 
         # After training is done, we save the final weights.
-        self.dqn.save_weights('dqn_{}_weights.h5'.format(env_name), overwrite=True)
+        self.dqn.save_weights('models/dqn_{}_weights.h5'.format(env_name), overwrite=True)
 
         # Finally, evaluate our algorithm for 5 episodes.
         self.dqn.test(self.env, nb_episodes=5, visualize=False)
@@ -115,11 +115,11 @@ class Player(PlayerBase):
         """Load a model"""
 
         # Load the architecture
-        with open('dqn_{}_json.json'.format(env_name), 'r') as architecture_json:
+        with open('models/dqn_{}_json.json'.format(env_name), 'r') as architecture_json:
             dqn_json = json.load(architecture_json)
 
         self.model = model_from_json(dqn_json)
-        self.model.load_weights('dqn_{}_weights.h5'.format(env_name))
+        self.model.load_weights('models/dqn_{}_weights.h5'.format(env_name))
 
     def play(self, nb_episodes=5, render=False):
         """Let the agent play"""

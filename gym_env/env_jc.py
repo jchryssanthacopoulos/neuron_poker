@@ -173,7 +173,7 @@ class HoldemTable(Env):
         log.info(f"Observation =\n{str(self.observation)}")
         log.info("End of reset")
 
-        return (self.observation.to_array(), {})
+        return self.observation.to_array()
 
     def step(self, action):  # pylint: disable=arguments-differ
         """Next player makes a move and a new environment is observed.
