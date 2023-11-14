@@ -5,6 +5,7 @@ neuron_poker.iml
 log/
 Graph/
 env
+tools/montecarlo_cpp/*.pyd
 *.pyc
 /tools/montecarlo_cpp/Debug/
 /tools/montecarlo_cpp/.vs/montecarlo_cpp/v16/

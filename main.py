@@ -206,7 +206,8 @@ class SelfPlay:
             initial_stacks=self.stack,
             funds_plot=self.funds_plot,
             render=self.render,
-            use_cpp_montecarlo=self.use_cpp_montecarlo
+            use_cpp_montecarlo=self.use_cpp_montecarlo,
+            check_fold_on_illegal_move=True
         )
 
         np.random.seed(123)

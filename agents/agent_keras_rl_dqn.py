@@ -25,10 +25,10 @@ from gym_env.env_jc import Action
 autoplay = True  # play automatically if played against keras-rl
 
 window_length = 1
-nb_max_start_steps = 1000  # random action
+nb_max_start_steps = 50  # random action
 train_interval = 100  # train every 100 steps
-nb_steps_warmup = 50  # before training starts, should be higher than start steps
-nb_steps = 100000
+nb_steps_warmup = 75  # before training starts, should be higher than start steps
+nb_steps = 200000
 memory_limit = int(nb_steps / 5)
 batch_size = 500  # items sampled from memory to train
 enable_double_dqn = False
