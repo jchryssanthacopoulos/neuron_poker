@@ -6,10 +6,12 @@ import json
 import time
 
 import numpy as np
+import pandas as pd
+from rl.agents import DQNAgent
+from rl.callbacks import Callback
+from rl.core import Processor
 from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
-from rl.agents import DQNAgent
-from rl.core import Processor
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, model_from_json
 from tensorflow.keras.callbacks import TensorBoard
@@ -32,6 +34,18 @@ batch_size = 500  # items sampled from memory to train
 enable_double_dqn = False
 
 log = logging.getLogger(__name__)
+        
+        
+class StacksLogger(Callback):
+    """Logger of player stacks per hand."""
+    def __init__(self):
+        self.stacks = pd.DataFrame()
+
+    def on_episode_end(self, episode, logs={}):
+        """Called at end of each episode."""
+        stacks_history = self.env.funds_history.copy(deep=True)
+        stacks_history['episode'] = episode + 1
+        self.stacks = pd.concat([self.stacks, stacks_history])
 
 
 class Player(PlayerBase):
@@ -112,7 +126,7 @@ class Player(PlayerBase):
         self.dqn.test(self.env, nb_episodes=5, visualize=False)
 
     def load(self, env_name):
-        """Load a model"""
+        """Load a model."""
 
         # Load the architecture
         with open('models/dqn_{}_json.json'.format(env_name), 'r') as architecture_json:
@@ -122,7 +136,7 @@ class Player(PlayerBase):
         self.model.load_weights('models/dqn_{}_weights.h5'.format(env_name))
 
     def play(self, nb_episodes=5, render=False):
-        """Let the agent play"""
+        """Let the agent play."""
         memory = SequentialMemory(limit=memory_limit, window_length=window_length)
         policy = TrumpPolicy()
 
@@ -150,7 +164,14 @@ class Player(PlayerBase):
                             batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn)
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])  # pylint: disable=no-member
 
-        self.dqn.test(self.env, nb_episodes=nb_episodes, visualize=render)
+        stacks_logger = StacksLogger()
+        stacks_logger._set_env(self.env)
+        callbacks = [stacks_logger]
+
+        self.dqn.test(self.env, nb_episodes=nb_episodes, visualize=render, callbacks=callbacks)
+
+        # return history of player stacks
+        return stacks_logger.stacks
 
     def action(self, action_space, observation, info):  # pylint: disable=no-self-use
         """Mandatory method that calculates the move based on the observation array and the action space."""

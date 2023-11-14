@@ -10,7 +10,6 @@ from typing import Optional
 from gym import Env
 from gym.spaces import Box
 from gym.spaces import Discrete
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -55,7 +54,9 @@ class HoldemTable(Env):
             render: bool = False,
             funds_plot: bool = True,
             max_raising_rounds: int = 2,
-            use_cpp_montecarlo: bool = False
+            use_cpp_montecarlo: bool = False,
+            check_fold_on_illegal_move: bool = False,
+            terminate_if_main_player_lost: bool = True
     ):
         """The table needs to be initialized once at the beginning.
 
@@ -69,6 +70,8 @@ class HoldemTable(Env):
             funds_plot: show plot of funds history at end of each episode
             max_raising_rounds: max raises per round per player
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
+            check_fold_on_illegal_move: Whether to resort to check/fold if action is illegal
+            terminate_if_main_player_lost: Whether to end the game if the main player has no more funds
 
         """
         if use_cpp_montecarlo:
@@ -109,6 +112,8 @@ class HoldemTable(Env):
         self.initial_stacks = initial_stacks
         self.funds_plot = funds_plot
         self.max_round_raising = max_raising_rounds
+        self.check_fold_on_illegal_move = check_fold_on_illegal_move
+        self.terminate_if_main_player_lost = terminate_if_main_player_lost
 
         # pots
         self.community_pot = 0
@@ -185,16 +190,29 @@ class HoldemTable(Env):
         log.info("Start of step")
         log.info(f"Action: {action}")
 
+        # this is not an autoplay agent, meaning the action has to be used
         if self._agent_is_autoplay():
             raise RuntimeError("Agent to step is autoplay agent.")
 
-        # this is not an autoplay agent, meaning the action has to be used
         self._get_environment()
 
+        should_step = True
+
         if Action(action) not in self.legal_moves:
-            log.warning(f"{action} is an Illegal move, try again. Currently allowed: {self.legal_moves}")
-            reward = self.illegal_move_reward
-        else:
+            if self.check_fold_on_illegal_move:
+                if Action.CHECK in self.legal_moves:
+                    log.warning(f"{action} is an illegal move. Setting to check")
+                    action = Action.CHECK
+                else:
+                    # if check is not present, fold is always an action
+                    log.warning(f"{action} is an illegal move. Setting to fold")
+                    action = Action.FOLD
+            else:
+                log.warning(f"{action} is an illegal move, try again. Currently allowed: {self.legal_moves}")
+                reward = self.illegal_move_reward
+                should_step = False
+
+        if should_step:
             self._execute_step(Action(action))
             self._advance_autoplay_players()
             reward = self._calculate_reward(action)
@@ -282,7 +300,7 @@ class HoldemTable(Env):
             self.render()
 
     def _calculate_reward(self, last_action):
-        """Preliminiary implementation of reward function
+        """Preliminiary implementation of reward function.
 
         Currently missing potential additional winnings from future contributions
 
@@ -315,9 +333,7 @@ class HoldemTable(Env):
         if action == Action.FOLD:
             self.player_cycle.deactivate_current()
             self.player_cycle.mark_folder()
-
         else:
-
             if action == Action.CALL:
                 contribution = min(self.min_call - self.player_pots[self.current_player.seat],
                                    self.current_player.stack)
@@ -430,12 +446,12 @@ class HoldemTable(Env):
         self._initiate_round()
 
     def _save_funds_history(self):
-        """Keep track of player funds history"""
+        """Keep track of player funds history."""
         funds_dict = {i: player.stack for i, player in enumerate(self.players)}
         self.funds_history = pd.concat([self.funds_history, pd.DataFrame(funds_dict, index=[0])])
 
     def _check_game_over(self):
-        """Check if only one player has money left"""
+        """Check if only one player has money left."""
         player_alive = []
         self.player_cycle.new_hand_reset()
 
@@ -448,7 +464,7 @@ class HoldemTable(Env):
                 self.player_status.append(False)
                 self.player_cycle.deactivate_player(idx)
 
-        if not self.player_cycle.can_still_make_moves_in_this_hand[0]:
+        if self.terminate_if_main_player_lost and not self.player_cycle.can_still_make_moves_in_this_hand[0]:
             # if main player cannot play, end round
             log.info("Main player lost.")
             self._game_over()
@@ -473,10 +489,7 @@ class HoldemTable(Env):
         self.done = True
         player_names = [f"{i} - {player.name}" for i, player in enumerate(self.players)]
         self.funds_history.columns = player_names
-        if self.funds_plot:
-            self.funds_history.reset_index(drop=True).plot()
         log.info(self.funds_history)
-        plt.show()
 
         winner_in_episodes.append(self.winner_ix)
         league_table = pd.Series(winner_in_episodes).value_counts()
@@ -485,7 +498,7 @@ class HoldemTable(Env):
         log.info(f"Best Player: {best_player}")
 
     def _initiate_round(self):
-        """A new round (flop, turn, river) is initiated"""
+        """A new round (flop, turn, river) is initiated."""
         self.last_caller = None
         self.last_raiser = None
         self.raisers = []
@@ -519,7 +532,7 @@ class HoldemTable(Env):
             raise RuntimeError()
 
     def add_player(self, agent):
-        """Add a player to the table. Has to happen at the very beginning"""
+        """Add a player to the table. Has to happen at the very beginning."""
         self.num_of_players += 1
         player = PlayerShell(stack_size=self.initial_stacks, name=agent.name)
         player.agent_obj = agent
@@ -530,7 +543,7 @@ class HoldemTable(Env):
         self.player_pots = [0] * len(self.players)
 
     def _end_round(self):
-        """End of preflop, flop, turn or river"""
+        """End of preflop, flop, turn or river."""
         self._close_round()
         if self.stage == Stage.PREFLOP:
             self.stage = Stage.FLOP
@@ -562,7 +575,7 @@ class HoldemTable(Env):
         self._award_winner(self.winner_ix)
 
     def _get_winner(self):
-        """Determine which player has won the hand"""
+        """Determine which player has won the hand."""
         potential_winners = self.player_cycle.get_potential_winners()
 
         potential_winner_idx = [i for i, potential_winner in enumerate(potential_winners) if potential_winner]
@@ -616,7 +629,7 @@ class HoldemTable(Env):
             return
 
     def _get_legal_moves(self):
-        """Determine what moves are allowed in the current state"""
+        """Determine what moves are allowed in the current state."""
         self.legal_moves = []
         if self.player_pots[self.current_player.seat] == max(self.player_pots):
             self.legal_moves.append(Action.CHECK)
@@ -637,7 +650,7 @@ class HoldemTable(Env):
         log.debug(f"Community+current round pot pot: {self.community_pot + self.current_round_pot}")
 
     def _close_round(self):
-        """put player_pots into community pots"""
+        """Put player pots into community pots."""
         self.community_pot += sum(self.player_pots)
         self.player_pots = [0] * len(self.players)
         self.played_in_round = 0
@@ -666,7 +679,7 @@ class HoldemTable(Env):
         log.info(f"Cards on table: {self.table_cards}")
 
     def render(self, mode='human'):
-        """Render the current state"""
+        """Render the current state."""
         screen_width = 600
         screen_height = 400
         table_radius = 200
