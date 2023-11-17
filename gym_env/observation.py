@@ -10,14 +10,13 @@ from tools.helper import flatten
 class CommunityData:
     """Data available to everybody"""
 
-    def __init__(self, num_actions: int):
+    def __init__(self, num_opponents: int):
         """Initialize."""
         self.stage = [False] * 4  # one hot: preflop, flop, turn, river
-        self.community_pot = None
-        self.current_round_pot = None
-        self.big_blind = 0
-        self.small_blind = 0
-        self.legal_moves = [0] * num_actions
+        self.community_pot = 0
+        self.current_round_pot = 0
+        self.stacks = [0] * num_opponents
+        self.blinds = [0] * num_opponents
 
     def ndim(self):
         """Get number of dimensions."""
@@ -44,11 +43,14 @@ class StageData:
 class PlayerData:
     "Player specific information"
 
-    def __init__(self, num_players: int):
+    def __init__(self, num_actions: int):
         """Initialize."""
-        self.is_dealer = None
-        self.stack = [None] * num_players
+        self.stack = 0
+        self.is_dealer = False
+        self.blind = 0
         self.equity_to_river_alive = 0
+        self.amount_to_call = 0
+        self.legal_moves = [0] * num_actions
 
     def ndim(self):
         """Get number of dimensions."""
@@ -62,21 +64,21 @@ class Observation:
         """Initialize."""
         self.player_data = player_data
         self.community_data = community_data
-        self.stage_data = stage_data
+        # self.stage_data = stage_data
 
     def ndim(self):
         """Get number of dimensions."""
         n = self.player_data.ndim()
         n += self.community_data.ndim()
-        n += len(self.stage_data) * self.stage_data[0].ndim()
+        # n += len(self.stage_data) * self.stage_data[0].ndim()
         return n
 
     def to_array(self):
         """Convert to numpy array."""
         arr1 = np.array(list(flatten(self.player_data.__dict__.values())), dtype='float32')
         arr2 = np.array(list(flatten(self.community_data.__dict__.values())), dtype='float32')
-        arr3 = np.array([list(flatten(sd.__dict__.values())) for sd in self.stage_data], dtype='float32').flatten()
-        return np.concatenate([arr1, arr2, arr3]).flatten()
+        # arr3 = np.array([list(flatten(sd.__dict__.values())) for sd in self.stage_data], dtype='float32').flatten()
+        return np.concatenate([arr1, arr2]).flatten()
 
     def __str__(self):
         """Get print-friendly version of the observation."""
@@ -88,10 +90,10 @@ class Observation:
         for k, v in self.community_data.__dict__.items():
             s += f"  {k}: {v}\n"
 
-        s += "Stage data:\n"
-        for i in range(len(self.stage_data)):
-            s += f"  Round {i + 1}\n"
-            for k, v in self.stage_data[i].__dict__.items():
-                s += f"    {k}: {v}\n"
+        # s += "Stage data:\n"
+        # for i in range(len(self.stage_data)):
+        #     s += f"  Round {i + 1}\n"
+        #     for k, v in self.stage_data[i].__dict__.items():
+        #         s += f"    {k}: {v}\n"
 
         return s[:-1]
