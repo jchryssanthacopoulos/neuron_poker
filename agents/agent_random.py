@@ -28,7 +28,6 @@ class Player(PlayerBase):
             Action.CHECK,
             Action.CALL,
             Action.RAISE_POT,
-            Action.RAISE_HALF_POT,
             Action.ALL_IN
         ]
 

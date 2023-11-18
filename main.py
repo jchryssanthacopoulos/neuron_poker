@@ -221,10 +221,9 @@ class SelfPlay:
         """Implementation of kreras-rl deep q learing."""
         env_name = 'neuron_poker-v0'
 
+        # play heads-up
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
-        bots = [
-            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
-        ]
+        bots = [EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)]
         env = gym.make(
             env_name,
             player=player,
@@ -249,14 +248,9 @@ class SelfPlay:
         """Create 6 players, one of them a trained DQN."""
         env_name = 'neuron_poker-v0'
 
+        # play heads-up
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
-        bots = [
-            EquityPlayer(name='equity/50/50', min_call_equity=0.5, min_bet_equity=0.7),
-            EquityPlayer(name='equity/50/80', min_call_equity=0.2, min_bet_equity=0.3),
-            EquityPlayer(name='equity/70/70', min_call_equity=0.7, min_bet_equity=0.7),
-            EquityPlayer(name='equity/20/30', min_call_equity=0.2, min_bet_equity=0.3),
-            RandomPlayer()
-        ]
+        bots = [EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)]
         self.env = gym.make(
             env_name,
             player=player,
