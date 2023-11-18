@@ -19,7 +19,8 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
 from agents import PlayerBase
-from gym_env.env_jc import Action
+from gym_env.action import Action
+from gym_env.processor import LegalMovesProcessor
 
 
 autoplay = True  # play automatically if played against keras-rl
@@ -91,10 +92,11 @@ class Player(PlayerBase):
 
         nb_actions = env.action_space.n
 
-        self.dqn = DQNAgent(model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
-                            target_model_update=1e-2, policy=policy,
-                            processor=CustomProcessor(),
-                            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn)
+        self.dqn = DQNAgent(
+            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
+            target_model_update=1e-2, policy=policy, processor=LegalMovesProcessor(env.num_opponents, nb_actions),
+            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn
+        )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
     def start_step_policy(self, observation):
@@ -108,11 +110,14 @@ class Player(PlayerBase):
         """Train a model."""
         # initiate training loop
         timestr = time.strftime("%Y%m%d-%H%M%S") + "_" + str(env_name)
-        tensorboard = TensorBoard(log_dir='./Graph/{}'.format(timestr), histogram_freq=0, write_graph=True,
-                                  write_images=False)
+        tensorboard = TensorBoard(
+            log_dir='./Graph/{}'.format(timestr), histogram_freq=0, write_graph=True, write_images=False
+        )
 
-        self.dqn.fit(self.env, nb_max_start_steps=nb_max_start_steps, nb_steps=nb_steps, visualize=False, verbose=2,
-                     start_step_policy=self.start_step_policy, callbacks=[tensorboard])
+        self.dqn.fit(
+            self.env, nb_max_start_steps=nb_max_start_steps, nb_steps=nb_steps, visualize=False, verbose=2,
+            start_step_policy=self.start_step_policy, callbacks=[tensorboard]
+        )
 
         # Save the architecture
         dqn_json = self.model.to_json()
@@ -158,10 +163,11 @@ class Player(PlayerBase):
 
         nb_actions = self.env.action_space.n
 
-        self.dqn = DQNAgent(model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
-                            target_model_update=1e-2, policy=policy,
-                            processor=CustomProcessor(),
-                            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn)
+        self.dqn = DQNAgent(
+            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
+            target_model_update=1e-2, policy=policy, processor=LegalMovesProcessor(self.env.num_opponents, nb_actions),
+            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn
+        )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])  # pylint: disable=no-member
 
         stacks_logger = StacksLogger()
@@ -214,39 +220,5 @@ class TrumpPolicy(BoltzmannQPolicy):
         probs = exp_values / np.sum(exp_values)
         action = np.random.choice(range(nb_actions), p=probs)
         log.info(f"Chosen action by keras-rl {action} - probabilities: {probs}")
-        return action
-
-
-class CustomProcessor(Processor):
-    """The agent and the environment"""
-
-    def __init__(self):
-        """initizlie properties"""
-        self.legal_moves_limit = None
-
-    def process_state_batch(self, batch):
-        """Remove second dimension to make it possible to pass it into cnn"""
-        return np.squeeze(batch, axis=1)
-
-    def process_info(self, info):
-        if 'legal_moves' in info.keys():
-            self.legal_moves_limit = info['legal_moves']
-        else:
-            self.legal_moves_limit = None
-        return {'x': 1}  # on arrays allowed it seems
-
-    def process_action(self, action):
-        """Find nearest legal action"""
-        if 'legal_moves_limit' in self.__dict__ and self.legal_moves_limit is not None:
-            self.legal_moves_limit = [move.value for move in self.legal_moves_limit]
-            if action not in self.legal_moves_limit:
-                for i in range(5):
-                    action += i
-                    if action in self.legal_moves_limit:
-                        break
-                    action -= i * 2
-                    if action in self.legal_moves_limit:
-                        break
-                    action += i
 
         return action

@@ -1,7 +1,7 @@
 """Player based on equity."""
 
 from agents import PlayerBase
-from gym_env.env_jc import Action
+from gym_env.action import Action
 
 autoplay = True  # play automatically if played against keras-rl
 
@@ -22,7 +22,7 @@ class Player(PlayerBase):
     def action(self, action_space, observation, info):  # pylint: disable=no-self-use
         """Mandatory method that calculates the move based on the observation array and the action space."""
         _ = observation
-        equity_alive = info['player_data']['equity_to_river_alive']
+        equity_alive = info['player_data']['equity']
 
         incremen1 = .1
         increment2 = .2
