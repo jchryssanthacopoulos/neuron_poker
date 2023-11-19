@@ -75,8 +75,8 @@ def command_line_parser():
             use_cpp_montecarlo=args['--use_cpp_montecarlo'],
             funds_plot=args['--funds_plot'],
             stack=int(args['--stack']),
-            small_blind=int(args['--small_blind']),
-            big_blind=int(args['--big_blind'])
+            small_blind=float(args['--small_blind']),
+            big_blind=float(args['--big_blind'])
         )
 
         if args['random']:
@@ -104,7 +104,7 @@ def command_line_parser():
 class SelfPlay:
     """Orchestration of playing against itself."""
 
-    def __init__(self, render, num_episodes, use_cpp_montecarlo, funds_plot, stack=500, small_blind=5, big_blind=10):
+    def __init__(self, render, num_episodes, use_cpp_montecarlo, funds_plot, stack=500, small_blind=2.5, big_blind=5):
         """Initialize."""
         self.winner_in_episodes = []
         self.use_cpp_montecarlo = use_cpp_montecarlo
