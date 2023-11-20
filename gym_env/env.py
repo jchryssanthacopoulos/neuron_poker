@@ -25,8 +25,6 @@ from tools.hand_evaluator import get_winner
 
 log = logging.getLogger(__name__)
 
-winner_in_episodes = []
-
 
 class Stage(Enum):
     """Different game stages."""
@@ -50,7 +48,6 @@ class HoldemTable(Env):
             small_blind: int = 2.5,
             big_blind: int = 5,
             render: bool = False,
-            funds_plot: bool = True,
             max_raising_rounds: int = 2,
             use_cpp_montecarlo: bool = False,
             check_fold_on_illegal_move: bool = False,
@@ -66,7 +63,6 @@ class HoldemTable(Env):
             small_blind: Value of small blind
             big_blind: Value of big blind
             render: render table after each move in graphical format
-            funds_plot: show plot of funds history at end of each episode
             max_raising_rounds: max raises per round per player
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
             check_fold_on_illegal_move: Whether to resort to check/fold if action is illegal
@@ -107,8 +103,9 @@ class HoldemTable(Env):
         self.deck = None
         self.action = None
         self.winner_ix = None
+        self.winner_in_hands = None
+        self.winner_in_episodes = None
         self.initial_stacks = initial_stacks
-        self.funds_plot = funds_plot
         self.max_round_raising = max_raising_rounds
         self.check_fold_on_illegal_move = check_fold_on_illegal_move
         self.terminate_if_main_player_lost = terminate_if_main_player_lost
@@ -122,6 +119,7 @@ class HoldemTable(Env):
         self.done = False
         self.early_stop = False
         self.funds_history = None
+        self.actions_history = None
         self.legal_moves = None
         self.illegal_move_reward = -100
         self.action_space = Discrete(len(Action))
@@ -155,6 +153,9 @@ class HoldemTable(Env):
         self.done = False
         self.early_stop = False
         self.funds_history = pd.DataFrame()
+        self.actions_history = pd.DataFrame()
+        self.winner_in_hands = []
+        self.winner_in_episodes = []
         self.first_action_for_hand = [True] * len(self.players)
 
         for player in self.players:
@@ -403,6 +404,12 @@ class HoldemTable(Env):
             f"player pot: {self.player_pots[self.current_player.seat]}"
         )
 
+        # log action
+        self.actions_history = pd.concat([
+            self.actions_history,
+            pd.DataFrame.from_dict({'player': [self.current_player.seat], 'action': [action]})
+        ])
+
     def _start_new_hand(self):
         """Deal new cards to players and reset table states."""
         self._save_funds_history()
@@ -479,8 +486,10 @@ class HoldemTable(Env):
 
         remaining_players = sum(player_alive)
         if remaining_players < 2:
+            self.winner_in_episodes.append(self.winner_ix)
             self._game_over()
             return True
+
         return False
 
     def _game_over(self):
@@ -492,8 +501,8 @@ class HoldemTable(Env):
         self.funds_history.columns = player_names
         log.info(self.funds_history)
 
-        winner_in_episodes.append(self.winner_ix)
-        league_table = pd.Series(winner_in_episodes).value_counts()
+        # self.winner_in_episodes.append(self.winner_ix)
+        league_table = pd.Series(self.winner_in_episodes).value_counts()
         best_player = league_table.index[0]
         log.info(league_table)
         log.info(f"Best Player: {best_player}")
@@ -583,15 +592,17 @@ class HoldemTable(Env):
         if sum(potential_winners) == 1:
             winner_ix = [i for i, active in enumerate(potential_winners) if active][0]
             winning_card_type = 'Only remaining player in round'
-
         else:
             assert self.stage == Stage.SHOWDOWN
-            remaining_player_winner_ix, winning_card_type = get_winner([player.cards
-                                                                        for ix, player in enumerate(self.players) if
-                                                                        potential_winners[ix]],
-                                                                       self.table_cards)
+            remaining_player_winner_ix, winning_card_type = get_winner(
+                [player.cards for ix, player in enumerate(self.players) if potential_winners[ix]], self.table_cards
+            )
             winner_ix = potential_winner_idx[remaining_player_winner_ix]
+
+        self.winner_in_hands.append(winner_ix)
+
         log.info(f"Player {winner_ix} won: {winning_card_type}")
+
         return winner_ix
 
     def _award_winner(self, winner_ix):

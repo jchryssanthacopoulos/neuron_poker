@@ -268,16 +268,34 @@ class SelfPlay:
         self.env.reset(seed=123)
 
         dqn = DQNPlayer(load_model=model_name, env=self.env)
-        stacks = dqn.play(nb_episodes=self.num_episodes, render=self.render)
+        play_logger = dqn.play(nb_episodes=self.num_episodes, render=self.render)
 
         # get cumulative wins/losses across hands
         diff_stacks = pd.DataFrame()
 
         for i in range(self.num_episodes):
-            stacks_for_episode = stacks[stacks.episode == i + 1]
+            stacks_for_episode = play_logger.stacks[play_logger.stacks.episode == i + 1]
             diff_stacks = pd.concat([diff_stacks, stacks_for_episode.diff().dropna().drop('episode', axis=1)])
 
+        plt.figure(figsize=(7, 5))
         diff_stacks.cumsum().plot(use_index=False)
+
+        plt.figure(figsize=(7, 5))
+        play_logger.actions[play_logger.actions.player == 0].action.apply(lambda x: x.name if x.name not in ['SMALL', 'BIG'] else None).hist()
+        plt.title(f"{player.name} actions")
+
+        plt.figure(figsize=(7, 5))
+        play_logger.actions[play_logger.actions.player == 1].action.apply(lambda x: x.name if x.name not in ['SMALL', 'BIG'] else None).hist()
+        plt.title(f"{bots[0].name} actions")
+
+        plt.figure(figsize=(7, 5))
+        play_logger.winner_in_hands.winner.hist()
+        plt.title("Winners of hands")
+
+        plt.figure(figsize=(7, 5))
+        play_logger.winner_in_episodes.winner.hist()
+        plt.title("Winners of episodes")
+
         plt.show()
 
     def dqn_train_custom_q1(self):

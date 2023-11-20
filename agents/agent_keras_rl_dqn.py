@@ -8,7 +8,6 @@ import time
 import numpy as np
 import pandas as pd
 from rl.agents import DQNAgent
-from rl.callbacks import Callback
 from rl.core import Processor
 from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
@@ -20,6 +19,7 @@ from tensorflow.keras.optimizers import Adam
 
 from agents import PlayerBase
 from gym_env.action import Action
+from gym_env.logger import PlayLogger
 from gym_env.processor import LegalMovesProcessor
 
 
@@ -35,18 +35,6 @@ batch_size = 500  # items sampled from memory to train
 enable_double_dqn = False
 
 log = logging.getLogger(__name__)
-        
-        
-class StacksLogger(Callback):
-    """Logger of player stacks per hand."""
-    def __init__(self):
-        self.stacks = pd.DataFrame()
-
-    def on_episode_end(self, episode, logs={}):
-        """Called at end of each episode."""
-        stacks_history = self.env.funds_history.copy(deep=True)
-        stacks_history['episode'] = episode + 1
-        self.stacks = pd.concat([self.stacks, stacks_history])
 
 
 class Player(PlayerBase):
@@ -145,22 +133,6 @@ class Player(PlayerBase):
         memory = SequentialMemory(limit=memory_limit, window_length=window_length)
         policy = TrumpPolicy()
 
-        class CustomProcessor(Processor):  # pylint: disable=redefined-outer-name
-            """The agent and the environment"""
-
-            def process_state_batch(self, batch):
-                """
-                Given a state batch, I want to remove the second dimension, because it's
-                useless and prevents me from feeding the tensor into my CNN
-                """
-                return np.squeeze(batch, axis=1)
-
-            def process_info(self, info):
-                processed_info = info['player_data']
-                if 'stack' in processed_info:
-                    processed_info = {'x': 1}
-                return processed_info
-
         nb_actions = self.env.action_space.n
 
         self.dqn = DQNAgent(
@@ -170,14 +142,13 @@ class Player(PlayerBase):
         )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])  # pylint: disable=no-member
 
-        stacks_logger = StacksLogger()
-        stacks_logger._set_env(self.env)
-        callbacks = [stacks_logger]
+        play_logger = PlayLogger()
+        play_logger._set_env(self.env)
 
-        self.dqn.test(self.env, nb_episodes=nb_episodes, visualize=render, callbacks=callbacks)
+        self.dqn.test(self.env, nb_episodes=nb_episodes, visualize=render, callbacks=[play_logger])
 
-        # return history of player stacks
-        return stacks_logger.stacks
+        # return history of player stacks and actions
+        return play_logger
 
     def action(self, action_space, observation, info):  # pylint: disable=no-self-use
         """Mandatory method that calculates the move based on the observation array and the action space."""
