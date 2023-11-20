@@ -501,7 +501,6 @@ class HoldemTable(Env):
         self.funds_history.columns = player_names
         log.info(self.funds_history)
 
-        # self.winner_in_episodes.append(self.winner_ix)
         league_table = pd.Series(self.winner_in_episodes).value_counts()
         best_player = league_table.index[0]
         log.info(league_table)
