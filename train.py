@@ -117,12 +117,12 @@ if __name__ == '__main__':
         use_cpp_montecarlo=args.use_cpp_montecarlo
     )
 
-    if args.env_type == 'dqn_agent_equity_HU':
-        trainer.dqn_train_equity_HU(
-            args.model_name,
-            args.call_equity,
-            args.bet_equity,
-            args.nb_steps,
-            args.nb_max_start_steps,
-            args.nb_steps_warmup
-        )
+    # this is the only option
+    trainer.dqn_train_equity_HU(
+        args.model_name,
+        args.call_equity,
+        args.bet_equity,
+        args.nb_steps,
+        args.nb_max_start_steps,
+        args.nb_steps_warmup
+    )

@@ -14,6 +14,7 @@ from agents.agent_random import Player as RandomPlayer
 from gym_env.action import ActionBlind
 from gym_env.env import PlayerShell
 from gym_env.logger import PlayLogger
+from gym_env.processor import SingleOpponentLegalMovesProcessor
 from tools.helper import get_config
 from tools.helper import init_logger
 
@@ -115,6 +116,45 @@ class SelfPlay:
 
         return play_logger
 
+    def dqn_agent_vs_five_players(self, model_name: str) -> PlayLogger:
+        """Simulate play between DQN agent and five other players.
+
+        Args:
+            model_name: Name of model to load
+
+        """
+        player = PlayerShell(name='keras-rl', stack_size=self.stack)
+        bots = [
+            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+            RandomPlayer(),
+            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+            RandomPlayer(),
+            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
+        ]
+
+        env = gym.make(
+            ENV_NAME,
+            player=player,
+            bots=bots,
+            initial_stacks=self.stack,
+            small_blind=self.small_blind,
+            big_blind=self.big_blind,
+            render=self.render,
+            use_cpp_montecarlo=self.use_cpp_montecarlo,
+            terminate_if_main_player_lost=False
+        )
+
+        # reduce observation space down to one opponent
+        processor = SingleOpponentLegalMovesProcessor(env.num_opponents, env.action_space.n)
+
+        np.random.seed(123)
+        env.reset(seed=123)
+
+        dqn = DQNPlayer(load_model=model_name, env=env)
+        play_logger = dqn.play(nb_episodes=self.num_episodes, render=self.render, processor=processor)
+
+        return play_logger
+
 
 def display_stats(play_logger: PlayLogger):
     """Display player stats.
@@ -165,7 +205,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--env_type",
         help="Environment to run",
-        choices=['random_equity_HU', 'dqn_agent_equity_HU'],
+        choices=['random_equity_HU', 'dqn_agent_equity_HU', 'dqn_agent_five_players'],
         type=str,
         required=True
     )
@@ -204,5 +244,7 @@ if __name__ == '__main__':
         play_logger = runner.random_vs_equity_heads_up(args.call_equity, args.bet_equity)
     elif args.env_type == 'dqn_agent_equity_HU':
         play_logger = runner.dqn_agent_vs_equity_heads_up(args.model_name, args.call_equity, args.bet_equity)
+    else:
+        play_logger = runner.dqn_agent_vs_five_players(args.model_name)
 
     display_stats(play_logger)

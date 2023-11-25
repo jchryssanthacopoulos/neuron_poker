@@ -91,7 +91,6 @@ class CommunityData:
 
         for i in range(num_opponents):
             self.data[f'opp_stack_{i + 1}'] = 0
-        for i in range(num_opponents):
             self.data[f'opp_blind_{i + 1}'] = 0
 
     def ndim(self):

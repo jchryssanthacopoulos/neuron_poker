@@ -66,3 +66,33 @@ class LegalMovesProcessor(Processor):
             raise RuntimeError(f"Could not process the action {action}. Legal moves = {self.legal_moves}")
 
         raise RuntimeError(f"Could not process the action {action}. Legal moves = {self.legal_moves}")
+
+
+class SingleOpponentLegalMovesProcessor(LegalMovesProcessor):
+    """Processor to get legal moves and reduce space down to one effective opponent."""
+
+    def __init__(self, num_opponents: int, num_actions: int):
+        """initialize properties."""
+        super().__init__(num_opponents, num_actions)
+
+        observation = Observation(num_opponents, num_actions)
+
+        # consolidate stacks and blinds
+        self.num_obs_to_keep = observation.ndim() - 2 * (num_opponents - 1)
+        self.idx_stack_1 = observation.labels().index('opp_stack_1')
+        self.idx_blind_1 = observation.labels().index('opp_blind_1')
+        self.idx_other_stacks = []
+        self.idx_other_blinds = []
+        for i in range(1, num_opponents):
+            self.idx_other_stacks.append(observation.labels().index(f'opp_stack_{i + 1}'))
+            self.idx_other_blinds.append(observation.labels().index(f'opp_blind_{i + 1}'))
+
+    def process_observation(self, observation):
+        """Process the observation."""
+        _ = super().process_observation(observation)
+
+        # add opponent stacks and blinds to opponent 1
+        observation[self.idx_stack_1] += sum(observation[self.idx_other_stacks])
+        observation[self.idx_blind_1] += sum(observation[self.idx_other_blinds])
+
+        return observation[:self.num_obs_to_keep]

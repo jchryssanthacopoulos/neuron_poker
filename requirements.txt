@@ -7,7 +7,6 @@ numpy
 matplotlib
 pyglet==1.5.15
 keras-rl2
-docopt
 tensorflow==2.3.2
 tensorboard
 pybind11

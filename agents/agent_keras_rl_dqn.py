@@ -3,15 +3,19 @@
 import logging
 import json
 import time
+from typing import Optional
 
 import numpy as np
 from rl.agents import DQNAgent
+from rl.core import Processor
 from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, model_from_json
+from tensorflow.keras.models import model_from_json
+from tensorflow.keras.models import Sequential
 from tensorflow.keras.callbacks import TensorBoard
-from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dropout
 from tensorflow.keras.optimizers import Adam
 
 from agents import PlayerBase
@@ -132,17 +136,27 @@ class Player(PlayerBase):
         self.model = model_from_json(dqn_json)
         self.model.load_weights('models/dqn_{}_weights.h5'.format(env_name))
 
-    def play(self, nb_episodes=5, render=False):
-        """Let the agent play."""
+    def play(self, nb_episodes: int = 5, render: bool = False, processor: Optional[Processor] = None) -> PlayLogger:
+        """Let the agent play.
+
+        Args:
+            nb_episodes: Number of episodes to run
+            render: Whether to render
+            processor: Process to use to process actions, observations, etc.
+
+        """
+        nb_actions = self.env.action_space.n
+
+        if processor is None:
+            processor = LegalMovesProcessor(self.env.num_opponents, nb_actions)
+
         memory = SequentialMemory(limit=self.memory_limit, window_length=self.window_length)
         policy = TrumpPolicy()
 
-        nb_actions = self.env.action_space.n
-
         self.dqn = DQNAgent(
             model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=self.nb_steps_warmup,
-            target_model_update=1e-2, policy=policy, processor=LegalMovesProcessor(self.env.num_opponents, nb_actions),
-            batch_size=self.batch_size, train_interval=self.train_interval, enable_double_dqn=self.enable_double_dqn
+            target_model_update=1e-2, policy=policy, processor=processor, batch_size=self.batch_size,
+            train_interval=self.train_interval, enable_double_dqn=self.enable_double_dqn
         )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])  # pylint: disable=no-member
 
@@ -164,7 +178,6 @@ class Player(PlayerBase):
             Action.CHECK,
             Action.CALL,
             Action.RAISE_POT,
-            Action.RAISE_HALF_POT,
             Action.ALL_IN
         }
 
@@ -177,11 +190,11 @@ class Player(PlayerBase):
 class TrumpPolicy(BoltzmannQPolicy):
     """Custom policy when making decision based on neural network."""
 
-    def select_action(self, q_values):
+    def select_action(self, q_values: np.array):
         """Return the selected action.
 
         Arguments
-            q_values (np.ndarray): List of the estimations of Q for each action
+            q_values: List of the estimations of Q for each action
 
         Returns
             Selection action
