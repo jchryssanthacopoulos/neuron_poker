@@ -3,7 +3,7 @@
 import random
 
 from agents import PlayerBase
-from gym_env.env_jc import Action
+from gym_env.action import Action
 
 
 class Player(PlayerBase):
@@ -28,7 +28,6 @@ class Player(PlayerBase):
             Action.CHECK,
             Action.CALL,
             Action.RAISE_POT,
-            Action.RAISE_HALF_POT,
             Action.ALL_IN
         ]
 

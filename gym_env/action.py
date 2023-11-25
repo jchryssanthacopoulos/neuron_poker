@@ -10,9 +10,8 @@ class Action(Enum):
     FOLD = 0
     CHECK = 1
     CALL = 2
-    RAISE_HALF_POT = 3
-    RAISE_POT = 4
-    ALL_IN = 5
+    RAISE_POT = 3
+    ALL_IN = 4
 
 
 class ActionBlind(Enum):
