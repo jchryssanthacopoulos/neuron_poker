@@ -50,7 +50,6 @@ class HoldemTable(Env):
             render: bool = False,
             max_raising_rounds: int = 2,
             use_cpp_montecarlo: bool = False,
-            check_fold_on_illegal_move: bool = False,
             terminate_if_main_player_lost: bool = True,
             normalize_pot_values: bool = True
     ):
@@ -65,7 +64,6 @@ class HoldemTable(Env):
             render: render table after each move in graphical format
             max_raising_rounds: max raises per round per player
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
-            check_fold_on_illegal_move: Whether to resort to check/fold if action is illegal
             terminate_if_main_player_lost: Whether to end the game if the main player has no more funds
             normalize_pot_values: Whether to normalize pot values by big blind when saving history
 
@@ -107,7 +105,6 @@ class HoldemTable(Env):
         self.winner_in_episodes = None
         self.initial_stacks = initial_stacks
         self.max_round_raising = max_raising_rounds
-        self.check_fold_on_illegal_move = check_fold_on_illegal_move
         self.terminate_if_main_player_lost = terminate_if_main_player_lost
 
         # pots
@@ -501,10 +498,11 @@ class HoldemTable(Env):
         self.funds_history.columns = player_names
         log.info(self.funds_history)
 
-        league_table = pd.Series(self.winner_in_episodes).value_counts()
-        best_player = league_table.index[0]
-        log.info(league_table)
-        log.info(f"Best Player: {best_player}")
+        if self.winner_in_episodes:
+            league_table = pd.Series(self.winner_in_episodes).value_counts()
+            best_player = league_table.index[0]
+            log.info(league_table)
+            log.info(f"Best Player: {best_player}")
 
     def _initiate_round(self):
         """A new round (flop, turn, river) is initiated."""

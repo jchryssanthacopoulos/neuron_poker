@@ -1,14 +1,11 @@
 """Player based on a trained neural network."""
 
-# pylint: disable=wrong-import-order
 import logging
 import json
 import time
 
 import numpy as np
-import pandas as pd
 from rl.agents import DQNAgent
-from rl.core import Processor
 from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
 import tensorflow as tf
@@ -23,41 +20,48 @@ from gym_env.logger import PlayLogger
 from gym_env.processor import LegalMovesProcessor
 
 
-autoplay = True  # play automatically if played against keras-rl
-
-window_length = 1
-nb_max_start_steps = 400  # random action
-train_interval = 100      # train every 100 steps
-nb_steps_warmup = 600     # before training starts, should be higher than start steps
-nb_steps = 400000
-memory_limit = int(nb_steps / 5)
-batch_size = 500  # items sampled from memory to train
-enable_double_dqn = False
-
 log = logging.getLogger(__name__)
 
 
 class Player(PlayerBase):
     """Mandatory class with the player methods."""
 
-    def __init__(self, name='DQN', load_model=None, env=None):
-        """Initiaization of an agent."""
+    def __init__(self, load_model=None, env=None, nb_steps=400000, nb_max_start_steps=400, nb_steps_warmup=600):
+        """Initialize the agent.
+
+        Args:
+            load_model: Name of model to load
+            env: Name of environment to load
+            nb_steps: Number of steps to simulate in training
+            nb_max_start_steps: Maximum number of random steps to take at the beginning
+            nb_steps_warmup: Number of warmup steps to take
+
+        """
         self.equity_alive = 0
         self.actions = []
         self.last_action_in_stage = ''
         self.temp_stack = []
-        self.name = name
         self.autoplay = True
 
         self.dqn = None
         self.model = None
         self.env = env
 
+        # algorithm hyperparameters
+        self.nb_steps = nb_steps
+        self.nb_max_start_steps = nb_max_start_steps
+        self.nb_steps_warmup = nb_steps_warmup
+        self.window_length = 1
+        self.memory_limit = int(self.nb_steps / 5)
+        self.train_interval = 100      # train every X steps
+        self.batch_size = 500          # items sampled from memory to train
+        self.enable_double_dqn = False
+
         if load_model:
             self.load(load_model)
 
     def initiate_agent(self, env):
-        """initiate a deep Q agent."""
+        """Initiate a deep Q agent."""
         tf.compat.v1.disable_eager_execution()
 
         self.env = env
@@ -75,15 +79,15 @@ class Player(PlayerBase):
 
         # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
         # even the metrics!
-        memory = SequentialMemory(limit=memory_limit, window_length=window_length)
+        memory = SequentialMemory(limit=self.memory_limit, window_length=self.window_length)
         policy = TrumpPolicy()
 
         nb_actions = env.action_space.n
 
         self.dqn = DQNAgent(
-            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
+            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=self.nb_steps_warmup,
             target_model_update=1e-2, policy=policy, processor=LegalMovesProcessor(env.num_opponents, nb_actions),
-            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn
+            batch_size=self.batch_size, train_interval=self.train_interval, enable_double_dqn=self.enable_double_dqn
         )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
@@ -103,7 +107,7 @@ class Player(PlayerBase):
         )
 
         self.dqn.fit(
-            self.env, nb_max_start_steps=nb_max_start_steps, nb_steps=nb_steps, visualize=False, verbose=2,
+            self.env, nb_max_start_steps=self.nb_max_start_steps, nb_steps=self.nb_steps, visualize=False, verbose=2,
             start_step_policy=self.start_step_policy, callbacks=[tensorboard]
         )
 
@@ -115,7 +119,7 @@ class Player(PlayerBase):
         # After training is done, we save the final weights.
         self.dqn.save_weights('models/dqn_{}_weights.h5'.format(env_name), overwrite=True)
 
-        # Finally, evaluate our algorithm for 5 episodes.
+        # Finally, evaluate our algorithm for 5 episodes
         self.dqn.test(self.env, nb_episodes=5, visualize=False)
 
     def load(self, env_name):
@@ -130,15 +134,15 @@ class Player(PlayerBase):
 
     def play(self, nb_episodes=5, render=False):
         """Let the agent play."""
-        memory = SequentialMemory(limit=memory_limit, window_length=window_length)
+        memory = SequentialMemory(limit=self.memory_limit, window_length=self.window_length)
         policy = TrumpPolicy()
 
         nb_actions = self.env.action_space.n
 
         self.dqn = DQNAgent(
-            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=nb_steps_warmup,
+            model=self.model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=self.nb_steps_warmup,
             target_model_update=1e-2, policy=policy, processor=LegalMovesProcessor(self.env.num_opponents, nb_actions),
-            batch_size=batch_size, train_interval=train_interval, enable_double_dqn=enable_double_dqn
+            batch_size=self.batch_size, train_interval=self.train_interval, enable_double_dqn=self.enable_double_dqn
         )
         self.dqn.compile(Adam(lr=1e-3), metrics=['mae'])  # pylint: disable=no-member
 

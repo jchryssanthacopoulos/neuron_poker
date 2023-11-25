@@ -3,8 +3,6 @@
 from agents import PlayerBase
 from gym_env.action import Action
 
-autoplay = True  # play automatically if played against keras-rl
-
 
 class Player(PlayerBase):
     """Mandatory class with the player methods."""
@@ -24,7 +22,6 @@ class Player(PlayerBase):
         _ = observation
         equity_alive = info['player_data']['equity']
 
-        incremen1 = .1
         increment2 = .2
 
         if equity_alive > self.min_bet_equity + increment2 and Action.ALL_IN in action_space:
