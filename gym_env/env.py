@@ -17,7 +17,6 @@ from agents import PlayerBase
 from gym_env.action import Action
 from gym_env.action import ActionBlind
 from gym_env.observation import Observation
-from gym_env.observation import StageData
 from gym_env.rendering import PygletWindow, WHITE, RED, GREEN, BLUE
 from tools.hand_evaluator import get_winner
 
