@@ -8,6 +8,7 @@ import numpy as np
 
 from agents.agent_consider_equity import Player as EquityPlayer
 from agents.agent_keras_rl_dqn import Player as DQNPlayer
+from agents.agent_random import Player as RandomPlayer
 from gym_env.env import PlayerShell
 from tools.helper import get_config
 from tools.helper import init_logger
@@ -80,11 +81,60 @@ class Trainer:
         dqn.initiate_agent(env)
         dqn.train(model_name)
 
+    def dqn_train_five_players(
+            self,
+            model_name: str,
+            nb_steps: int,
+            nb_max_start_steps: int,
+            nb_steps_warmup: int
+    ):
+        """Train a DQN model against five other players.
+
+        Args:
+            model_name: Name of model to save
+            nb_steps: Number of steps to simulate in training
+            nb_max_start_steps: Maximum number of random steps to take at the beginning
+            nb_steps_warmup: Number of warmup steps to take
+
+        """
+        player = PlayerShell(name='keras-rl', stack_size=self.stack)
+        bots = [
+            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+            RandomPlayer(),
+            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+            RandomPlayer(),
+            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
+        ]
+
+        env = gym.make(
+            ENV_NAME,
+            player=player,
+            bots=bots,
+            initial_stacks=self.stack,
+            small_blind=self.small_blind,
+            big_blind=self.big_blind,
+            render=self.render,
+            use_cpp_montecarlo=self.use_cpp_montecarlo
+        )
+
+        np.random.seed(123)
+        env.reset(seed=123)
+
+        dqn = DQNPlayer(nb_steps=nb_steps, nb_max_start_steps=nb_max_start_steps, nb_steps_warmup=nb_steps_warmup)
+        dqn.initiate_agent(env)
+        dqn.train(model_name)
+
 
 if __name__ == '__main__':
     """Main entry point."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env_type", help="Environment to run", choices=['dqn_agent_equity_HU'], type=str, required=True)
+    parser.add_argument(
+        "--env_type",
+        help="Environment to run",
+        choices=['dqn_agent_equity_HU', 'dqn_agent_five_players'],
+        type=str,
+        required=True
+    )
     parser.add_argument("--model_name", help="DQN agent model name", type=str, default='dqn1')
     parser.add_argument("--stack", help="Initial stack", type=float, default=500)
     parser.add_argument("--small_blind", help="Small blind", type=float, default=2.5)
@@ -117,12 +167,19 @@ if __name__ == '__main__':
         use_cpp_montecarlo=args.use_cpp_montecarlo
     )
 
-    # this is the only option
-    trainer.dqn_train_equity_HU(
-        args.model_name,
-        args.call_equity,
-        args.bet_equity,
-        args.nb_steps,
-        args.nb_max_start_steps,
-        args.nb_steps_warmup
-    )
+    if args.env_type == 'dqn_agent_equity_HU':
+        trainer.dqn_train_equity_HU(
+            args.model_name,
+            args.call_equity,
+            args.bet_equity,
+            args.nb_steps,
+            args.nb_max_start_steps,
+            args.nb_steps_warmup
+        )
+    else:
+        trainer.dqn_train_five_players(
+            args.model_name,
+            args.nb_steps,
+            args.nb_max_start_steps,
+            args.nb_steps_warmup
+        )
