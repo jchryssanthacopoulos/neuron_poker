@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+from typing import Optional
 
 import gym
 import numpy as np
@@ -43,7 +44,8 @@ class Trainer:
             bet_equity: float,
             nb_steps: int,
             nb_max_start_steps: int,
-            nb_steps_warmup: int
+            nb_steps_warmup: int,
+            resume: Optional[bool] = False
     ):
         """Train a DQN model against an equity player in heads-up play.
 
@@ -54,6 +56,7 @@ class Trainer:
             nb_steps: Number of steps to simulate in training
             nb_max_start_steps: Maximum number of random steps to take at the beginning
             nb_steps_warmup: Number of warmup steps to take
+            resume: Whether to resume an existing training
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
@@ -78,7 +81,13 @@ class Trainer:
         env.reset(seed=123)
 
         dqn = DQNPlayer(nb_steps=nb_steps, nb_max_start_steps=nb_max_start_steps, nb_steps_warmup=nb_steps_warmup)
-        dqn.initiate_agent(env)
+
+        if resume:
+            # load existing model
+            dqn.initiate_agent(env, model_name)
+        else:
+            dqn.initiate_agent(env)
+
         dqn.train(model_name)
 
     def dqn_train_five_players(
@@ -86,7 +95,8 @@ class Trainer:
             model_name: str,
             nb_steps: int,
             nb_max_start_steps: int,
-            nb_steps_warmup: int
+            nb_steps_warmup: int,
+            resume: Optional[bool] = False
     ):
         """Train a DQN model against five other players.
 
@@ -95,6 +105,7 @@ class Trainer:
             nb_steps: Number of steps to simulate in training
             nb_max_start_steps: Maximum number of random steps to take at the beginning
             nb_steps_warmup: Number of warmup steps to take
+            resume: Whether to resume an existing training
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
@@ -121,7 +132,13 @@ class Trainer:
         env.reset(seed=123)
 
         dqn = DQNPlayer(nb_steps=nb_steps, nb_max_start_steps=nb_max_start_steps, nb_steps_warmup=nb_steps_warmup)
-        dqn.initiate_agent(env)
+
+        if resume:
+            # load existing model
+            dqn.initiate_agent(env, model_name)
+        else:
+            dqn.initiate_agent(env)
+
         dqn.train(model_name)
 
 
@@ -147,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_file", help="Log file", type=str, default='default')
     parser.add_argument("--log_level", help="Log level", type=int, default=logging.INFO)
     parser.add_argument("--render", help="Whether to render", action="store_true", default=False)
+    parser.add_argument("--resume", help="Whether to resume an existing training", action="store_true", default=False)
     parser.add_argument(
         "--use_cpp_montecarlo",
         help="Whether to use CPP file for MC simulation",
@@ -174,12 +192,14 @@ if __name__ == '__main__':
             args.bet_equity,
             args.nb_steps,
             args.nb_max_start_steps,
-            args.nb_steps_warmup
+            args.nb_steps_warmup,
+            args.resume
         )
     else:
         trainer.dqn_train_five_players(
             args.model_name,
             args.nb_steps,
             args.nb_max_start_steps,
-            args.nb_steps_warmup
+            args.nb_steps_warmup,
+            args.resume
         )

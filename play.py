@@ -145,13 +145,13 @@ class SelfPlay:
         )
 
         # reduce observation space down to one opponent
-        processor = SingleOpponentLegalMovesProcessor(env.num_opponents, env.action_space.n)
+        # processor = SingleOpponentLegalMovesProcessor(env.num_opponents, env.action_space.n)
 
         np.random.seed(123)
         env.reset(seed=123)
 
         dqn = DQNPlayer(load_model=model_name, env=env)
-        play_logger = dqn.play(nb_episodes=self.num_episodes, render=self.render, processor=processor)
+        play_logger = dqn.play(nb_episodes=self.num_episodes, render=self.render)
 
         return play_logger
 

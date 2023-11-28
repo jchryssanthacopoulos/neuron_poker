@@ -64,7 +64,7 @@ class Player(PlayerBase):
         if load_model:
             self.load(load_model)
 
-    def initiate_agent(self, env):
+    def initiate_agent(self, env, model_name: Optional[str] = None):
         """Initiate a deep Q agent."""
         tf.compat.v1.disable_eager_execution()
 
@@ -72,14 +72,19 @@ class Player(PlayerBase):
 
         nb_actions = self.env.action_space.n
 
-        self.model = Sequential()
-        self.model.add(Dense(512, activation='relu', input_shape=env.observation_space.shape))
-        self.model.add(Dropout(0.2))
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(0.2))
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(0.2))
-        self.model.add(Dense(nb_actions, activation='linear'))
+        if model_name is not None:
+            # load an existing model
+            self.load(model_name)
+        else:
+            # initialize a model from scratch
+            self.model = Sequential()
+            self.model.add(Dense(512, activation='relu', input_shape=env.observation_space.shape))
+            self.model.add(Dropout(0.2))
+            self.model.add(Dense(512, activation='relu'))
+            self.model.add(Dropout(0.2))
+            self.model.add(Dense(512, activation='relu'))
+            self.model.add(Dropout(0.2))
+            self.model.add(Dense(nb_actions, activation='linear'))
 
         # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
         # even the metrics!
@@ -102,7 +107,7 @@ class Player(PlayerBase):
         action = self.env.action_space.sample()
         return action
 
-    def train(self, env_name):
+    def train(self, env_name: str):
         """Train a model."""
         # initiate training loop
         timestr = time.strftime("%Y%m%d-%H%M%S") + "_" + str(env_name)
@@ -126,7 +131,7 @@ class Player(PlayerBase):
         # Finally, evaluate our algorithm for 5 episodes
         self.dqn.test(self.env, nb_episodes=5, visualize=False)
 
-    def load(self, env_name):
+    def load(self, env_name: str):
         """Load a model."""
 
         # Load the architecture
