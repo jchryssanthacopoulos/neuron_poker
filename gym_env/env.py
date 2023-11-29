@@ -50,7 +50,11 @@ class HoldemTable(Env):
             max_raising_rounds: int = 2,
             use_cpp_montecarlo: bool = False,
             terminate_if_main_player_lost: bool = True,
-            normalize_pot_values: bool = True
+            normalize_pot_values: bool = True,
+            zoom: bool = False,
+            min_zoom_table_stack = 250,
+            max_zoom_table_stack = 2500,
+            bot_space: List[PlayerBase] = None
     ):
         """The table needs to be initialized once at the beginning.
 
@@ -65,6 +69,10 @@ class HoldemTable(Env):
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
             terminate_if_main_player_lost: Whether to end the game if the main player has no more funds
             normalize_pot_values: Whether to normalize pot values by big blind when saving history
+            zoom: Whether a zoom table should be simulated
+            min_zoom_table_stack: Minimum stack for zoom table bots
+            max_zoom_table_stack: Maximum stack for zoom table bots
+            bot_space: Set of bots to sample from in a zoom table
 
         """
         if use_cpp_montecarlo:
@@ -128,6 +136,12 @@ class HoldemTable(Env):
         self.time_in_hand = None
 
         self.pot_norm = 100 * self.big_blind if normalize_pot_values else 1
+
+        # variables related to zoom table
+        self.zoom = zoom
+        self.min_zoom_table_stack = min_zoom_table_stack
+        self.max_zoom_table_stack = max_zoom_table_stack
+        self.bot_space = bot_space
 
         # add players to table, starting with the main player
         self.add_player(player)
@@ -443,6 +457,9 @@ class HoldemTable(Env):
         for player in self.players:
             player.cards = []
             player.actions = []
+            # if self.zoom:
+            #     player.stack = np.random.uniform(low=self.min_zoom_table_stack, high=self.max_zoom_table_stack, size=1)
+            # sample agents
 
         self._next_dealer()
 

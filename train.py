@@ -1,6 +1,7 @@
 """"Script to train AI agent."""
 
 import argparse
+from copy import deepcopy
 import logging
 from typing import Optional
 
@@ -36,6 +37,17 @@ class Trainer:
         self.render = render
         self.use_cpp_montecarlo = use_cpp_montecarlo
         self.log = logging.getLogger(__name__)
+
+        self.bot_space = [
+            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+            EquityPlayer(name='equity/20/40', min_call_equity=0.2, min_bet_equity=0.4),
+            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+            EquityPlayer(name='equity/40/60', min_call_equity=0.4, min_bet_equity=0.6),
+            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
+            RandomPlayer(),
+            RandomPlayer(),
+            RandomPlayer()
+        ]
 
     def dqn_train_equity_HU(
             self,
@@ -96,7 +108,8 @@ class Trainer:
             nb_steps: int,
             nb_max_start_steps: int,
             nb_steps_warmup: int,
-            resume: Optional[bool] = False
+            resume: Optional[bool] = False,
+            zoom: Optional[bool] = False
     ):
         """Train a DQN model against five other players.
 
@@ -106,16 +119,24 @@ class Trainer:
             nb_max_start_steps: Maximum number of random steps to take at the beginning
             nb_steps_warmup: Number of warmup steps to take
             resume: Whether to resume an existing training
+            zoom: Whether a zoom table should be simulated
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
-        bots = [
-            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
-            RandomPlayer(),
-            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
-            RandomPlayer(),
-            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
-        ]
+
+        if zoom:
+            rand_idx = np.random.randint(len(self.bot_space), size=5)
+            bots = []
+            for idx in rand_idx:
+                bots.append(deepcopy(self.bot_space[idx]))
+        else:
+            bots = [
+                EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+                RandomPlayer(),
+                EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+                RandomPlayer(),
+                EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
+            ]
 
         env = gym.make(
             ENV_NAME,
@@ -125,7 +146,9 @@ class Trainer:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
-            use_cpp_montecarlo=self.use_cpp_montecarlo
+            use_cpp_montecarlo=self.use_cpp_montecarlo,
+            zoom=zoom,
+            bot_space=self.bot_space
         )
 
         np.random.seed(123)
@@ -165,6 +188,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_level", help="Log level", type=int, default=logging.INFO)
     parser.add_argument("--render", help="Whether to render", action="store_true", default=False)
     parser.add_argument("--resume", help="Whether to resume an existing training", action="store_true", default=False)
+    parser.add_argument("--zoom", help="Whether a zoom table should be simulated", action="store_true", default=False)
     parser.add_argument(
         "--use_cpp_montecarlo",
         help="Whether to use CPP file for MC simulation",
@@ -201,5 +225,6 @@ if __name__ == '__main__':
             args.nb_steps,
             args.nb_max_start_steps,
             args.nb_steps_warmup,
-            args.resume
+            args.resume,
+            args.zoom
         )

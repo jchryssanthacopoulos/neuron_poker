@@ -1,6 +1,7 @@
 """Script to simulate play and collect statistics."""
 
 import argparse
+from copy import deepcopy
 import logging
 
 import gym
@@ -42,6 +43,17 @@ class SelfPlay:
         self.render = render
         self.use_cpp_montecarlo = use_cpp_montecarlo
         self.log = logging.getLogger(__name__)
+
+        self.bot_space = [
+            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+            EquityPlayer(name='equity/20/40', min_call_equity=0.2, min_bet_equity=0.4),
+            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+            EquityPlayer(name='equity/40/60', min_call_equity=0.4, min_bet_equity=0.6),
+            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
+            RandomPlayer(),
+            RandomPlayer(),
+            RandomPlayer()
+        ]
 
     def random_vs_equity_heads_up(self, call_equity: float, bet_equity: float) -> PlayLogger:
         """Simulate heads-up play between random and equity players.
@@ -116,21 +128,29 @@ class SelfPlay:
 
         return play_logger
 
-    def dqn_agent_vs_five_players(self, model_name: str) -> PlayLogger:
+    def dqn_agent_vs_five_players(self, model_name: str, randomize_bots: bool = False) -> PlayLogger:
         """Simulate play between DQN agent and five other players.
 
         Args:
             model_name: Name of model to load
+            randomize_bots: Whether to select random bots to play against
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
-        bots = [
-            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
-            RandomPlayer(),
-            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
-            RandomPlayer(),
-            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
-        ]
+
+        if randomize_bots:
+            rand_idx = np.random.randint(len(self.bot_space), size=5)
+            bots = []
+            for idx in rand_idx:
+                bots.append(deepcopy(self.bot_space[idx]))
+        else:
+            bots = [
+                EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
+                RandomPlayer(),
+                EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
+                RandomPlayer(),
+                EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
+            ]
 
         env = gym.make(
             ENV_NAME,
@@ -219,6 +239,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_file", help="Log file", type=str, default='default')
     parser.add_argument("--log_level", help="Log level", type=int, default=logging.INFO)
     parser.add_argument("--render", help="Whether to render", action="store_true", default=False)
+    parser.add_argument("--randomize_bots", help="Whether to randomize opponents", action="store_true", default=False)
     parser.add_argument(
         "--use_cpp_montecarlo",
         help="Whether to use CPP file for MC simulation",
@@ -245,6 +266,6 @@ if __name__ == '__main__':
     elif args.env_type == 'dqn_agent_equity_HU':
         play_logger = runner.dqn_agent_vs_equity_heads_up(args.model_name, args.call_equity, args.bet_equity)
     else:
-        play_logger = runner.dqn_agent_vs_five_players(args.model_name)
+        play_logger = runner.dqn_agent_vs_five_players(args.model_name, args.randomize_bots)
 
     display_stats(play_logger)
