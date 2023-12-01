@@ -126,9 +126,7 @@ class Trainer:
 
         if zoom:
             rand_idx = np.random.randint(len(self.bot_space), size=5)
-            bots = []
-            for idx in rand_idx:
-                bots.append(deepcopy(self.bot_space[idx]))
+            bots = [deepcopy(self.bot_space[idx]) for idx in rand_idx]
         else:
             bots = [
                 EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),

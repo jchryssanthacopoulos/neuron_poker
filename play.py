@@ -44,15 +44,16 @@ class SelfPlay:
         self.use_cpp_montecarlo = use_cpp_montecarlo
         self.log = logging.getLogger(__name__)
 
+        # the space of bots that can be sampled from to compose a table
         self.bot_space = [
             EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
             EquityPlayer(name='equity/20/40', min_call_equity=0.2, min_bet_equity=0.4),
             EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
             EquityPlayer(name='equity/40/60', min_call_equity=0.4, min_bet_equity=0.6),
             EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
-            RandomPlayer(),
-            RandomPlayer(),
-            RandomPlayer()
+            RandomPlayer(name='random_1'),
+            RandomPlayer(name='random_2'),
+            RandomPlayer(name='random_3')
         ]
 
     def random_vs_equity_heads_up(self, call_equity: float, bet_equity: float) -> PlayLogger:
@@ -128,21 +129,20 @@ class SelfPlay:
 
         return play_logger
 
-    def dqn_agent_vs_five_players(self, model_name: str, randomize_bots: bool = False) -> PlayLogger:
+    def dqn_agent_vs_five_players(self, model_name: str, randomize_bots: bool = False, zoom: bool = False) -> PlayLogger:
         """Simulate play between DQN agent and five other players.
 
         Args:
             model_name: Name of model to load
             randomize_bots: Whether to select random bots to play against
+            zoom: Whether a zoom table should be simulated
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
 
         if randomize_bots:
             rand_idx = np.random.randint(len(self.bot_space), size=5)
-            bots = []
-            for idx in rand_idx:
-                bots.append(deepcopy(self.bot_space[idx]))
+            bots = [deepcopy(self.bot_space[idx]) for idx in rand_idx]
         else:
             bots = [
                 EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
@@ -152,6 +152,8 @@ class SelfPlay:
                 EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
             ]
 
+        max_num_of_hands = 1 if zoom else 1000
+
         env = gym.make(
             ENV_NAME,
             player=player,
@@ -160,8 +162,11 @@ class SelfPlay:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
+            max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo,
-            terminate_if_main_player_lost=False
+            terminate_if_main_player_lost=False,
+            zoom=zoom,
+            bot_space=self.bot_space
         )
 
         # reduce observation space down to one opponent
@@ -189,7 +194,7 @@ def display_stats(play_logger: PlayLogger):
     diff_stacks = pd.DataFrame()
     for i in range(num_episodes):
         stacks_for_episode = play_logger.stacks[play_logger.stacks.episode == i + 1]
-        diff_stacks = pd.concat([diff_stacks, stacks_for_episode.diff().dropna().drop('episode', axis=1)])
+        diff_stacks = pd.concat([diff_stacks, stacks_for_episode.diff().dropna(how='all').drop('episode', axis=1)])
 
     # plot change in stacks
     plt.figure(figsize=(7, 5))
@@ -240,6 +245,7 @@ if __name__ == '__main__':
     parser.add_argument("--log_level", help="Log level", type=int, default=logging.INFO)
     parser.add_argument("--render", help="Whether to render", action="store_true", default=False)
     parser.add_argument("--randomize_bots", help="Whether to randomize opponents", action="store_true", default=False)
+    parser.add_argument("--zoom", help="Whether a zoom table should be simulated", action="store_true", default=False)
     parser.add_argument(
         "--use_cpp_montecarlo",
         help="Whether to use CPP file for MC simulation",
@@ -266,6 +272,6 @@ if __name__ == '__main__':
     elif args.env_type == 'dqn_agent_equity_HU':
         play_logger = runner.dqn_agent_vs_equity_heads_up(args.model_name, args.call_equity, args.bet_equity)
     else:
-        play_logger = runner.dqn_agent_vs_five_players(args.model_name, args.randomize_bots)
+        play_logger = runner.dqn_agent_vs_five_players(args.model_name, args.randomize_bots, args.zoom)
 
     display_stats(play_logger)

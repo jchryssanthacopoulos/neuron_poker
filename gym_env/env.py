@@ -1,5 +1,6 @@
 """Define poker environment."""
 
+from copy import deepcopy
 from enum import Enum
 import logging
 import time
@@ -47,13 +48,13 @@ class HoldemTable(Env):
             small_blind: int = 2.5,
             big_blind: int = 5,
             render: bool = False,
-            max_raising_rounds: int = 2,
+            max_num_of_hands: int = 1000,
             use_cpp_montecarlo: bool = False,
             terminate_if_main_player_lost: bool = True,
             normalize_pot_values: bool = True,
             zoom: bool = False,
             min_zoom_table_stack = 250,
-            max_zoom_table_stack = 2500,
+            max_zoom_table_stack = 1000,
             bot_space: List[PlayerBase] = None
     ):
         """The table needs to be initialized once at the beginning.
@@ -65,7 +66,7 @@ class HoldemTable(Env):
             small_blind: Value of small blind
             big_blind: Value of big blind
             render: render table after each move in graphical format
-            max_raising_rounds: max raises per round per player
+            max_num_of_hands: Maximum number of hands per episode
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
             terminate_if_main_player_lost: Whether to end the game if the main player has no more funds
             normalize_pot_values: Whether to normalize pot values by big blind when saving history
@@ -90,7 +91,7 @@ class HoldemTable(Env):
         self.render_switch = render
         self.players = []
         self.table_cards = None
-        self.dealer_pos = None
+        self.dealer_pos = -1
         self.player_status = []  # one hot encoded
         self.current_player = None
         self.player_cycle = None  # cycle iterator
@@ -111,7 +112,6 @@ class HoldemTable(Env):
         self.winner_in_hands = None
         self.winner_in_episodes = None
         self.initial_stacks = initial_stacks
-        self.max_round_raising = max_raising_rounds
         self.terminate_if_main_player_lost = terminate_if_main_player_lost
 
         # pots
@@ -132,7 +132,7 @@ class HoldemTable(Env):
         self.initiated_new_hand = False
         self.num_hands_session = 0
         self.total_num_hands = 0
-        self.max_num_of_hands = 1000
+        self.max_num_of_hands = max_num_of_hands
         self.time_in_hand = None
 
         self.pot_norm = 100 * self.big_blind if normalize_pot_values else 1
@@ -167,17 +167,26 @@ class HoldemTable(Env):
         self.winner_in_hands = []
         self.winner_in_episodes = []
         self.first_action_for_hand = [True] * len(self.players)
+        self.num_hands_session = 0
 
         for player in self.players:
             player.stack = self.initial_stacks
 
-        self.dealer_pos = 0
+        if not self.zoom:
+            # only reset dealer if zoom table is not being simulated
+            self.dealer_pos = -1
+
         self.player_cycle = PlayerCycle(
             self.players,
-            dealer_idx=-1,
+            dealer_idx=self.dealer_pos,
             max_steps_after_raiser=len(self.players) - 1,
             max_steps_after_big_blind=len(self.players)
         )
+
+        if self.zoom:
+            # if this is a zoom table, resample all the bots
+            self._resample_zoom_table_bots()
+
         self._start_new_hand()
         self._get_environment()
 
@@ -457,19 +466,45 @@ class HoldemTable(Env):
         for player in self.players:
             player.cards = []
             player.actions = []
-            # if self.zoom:
-            #     player.stack = np.random.uniform(low=self.min_zoom_table_stack, high=self.max_zoom_table_stack, size=1)
-            # sample agents
 
         self._next_dealer()
 
         self._distribute_cards()
+
         self._initiate_round()
+
+    def _resample_zoom_table_bots(self):
+        """Resample new zoom table bots."""
+        log.info("Zoom table: Subbing in new bots ...")
+
+        rand_idx = np.random.choice(len(self.bot_space), size=self.num_opponents, replace=False)
+        new_stacks = np.random.randint(
+            low=self.min_zoom_table_stack, high=self.max_zoom_table_stack, size=self.num_opponents
+        )
+
+        for idx, player in enumerate(self.players[1:]):
+            player.stack = new_stacks[idx]
+            player.agent_obj = deepcopy(self.bot_space[rand_idx[idx]])
+            player.name = player.agent_obj.name
+            log.info(f"Setting player {idx + 1} to {player.agent_obj.name} with stack ${player.stack}")
 
     def _save_funds_history(self):
         """Keep track of player funds history."""
-        funds_dict = {i: player.stack for i, player in enumerate(self.players)}
+        if self.zoom:
+            player_names = [self.players[0].name] + [bot.name for bot in self.bot_space]
+            funds_dict = {f'{idx} - {name}': np.nan for idx, name in enumerate(player_names)}
+            for player in self.players:
+                idx = player_names.index(player.name)
+                funds_dict[f'{idx} - {player.name}'] = player.stack
+        else:
+            funds_dict = {f'{i} - {player.name}': player.stack for i, player in enumerate(self.players)}
+
         self.funds_history = pd.concat([self.funds_history, pd.DataFrame(funds_dict, index=[0])])
+
+    def _get_zoom_table_idx(self, player_idx):
+        """Get the global zoom table index for a given player."""
+        player_names = [self.players[0].name] + [bot.name for bot in self.bot_space]
+        return player_names.index(self.players[player_idx].name)
 
     def _check_game_over(self):
         """Check if only one player has money left."""
@@ -499,7 +534,8 @@ class HoldemTable(Env):
 
         remaining_players = sum(player_alive)
         if remaining_players < 2:
-            self.winner_in_episodes.append(self.winner_ix)
+            idx = self._get_zoom_table_idx(self.winner_ix) if self.zoom else self.winner_idx
+            self.winner_in_episodes.append(idx)
             self._game_over()
             return True
 
@@ -508,10 +544,7 @@ class HoldemTable(Env):
     def _game_over(self):
         """End of an episode."""
         log.info("Game over.")
-        self.num_hands_session = 0
         self.done = True
-        player_names = [f"{i} - {player.name}" for i, player in enumerate(self.players)]
-        self.funds_history.columns = player_names
         log.info(self.funds_history)
 
         if self.winner_in_episodes:
@@ -527,15 +560,17 @@ class HoldemTable(Env):
         self.raisers = []
         self.callers = []
         self.min_call = 0
+
         for player in self.players:
             player.last_action_in_stage = ''
+
         self.player_cycle.new_round_reset()
 
         if self.stage == Stage.PREFLOP:
             log.info("")
-            log.info("===Round: Stage: PREFLOP")
+            log.info("=== Round: Stage: PREFLOP")
             # max steps total will be adjusted again at bb
-            self.player_cycle.max_steps_total = len(self.players) * self.max_round_raising + 2
+            self.player_cycle.max_steps_total = len(self.players) * 2 + 2
 
             self._next_player()
             self._process_decision(ActionBlind.SMALL)
@@ -544,7 +579,7 @@ class HoldemTable(Env):
             self._next_player()
 
         elif self.stage in [Stage.FLOP, Stage.TURN, Stage.RIVER]:
-            self.player_cycle.max_steps_total = len(self.players) * self.max_round_raising
+            self.player_cycle.max_steps_total = len(self.players) * 2
 
             self._next_player()
 
@@ -584,7 +619,7 @@ class HoldemTable(Env):
             self.stage = Stage.SHOWDOWN
 
         log.info("--------------------------------")
-        log.info(f"===ROUND: {self.stage} ===")
+        log.info(f"=== ROUND: {self.stage} ===")
         self._clean_up_pots()
 
     def _clean_up_pots(self):
@@ -612,7 +647,8 @@ class HoldemTable(Env):
             )
             winner_ix = potential_winner_idx[remaining_player_winner_ix]
 
-        self.winner_in_hands.append(winner_ix)
+        idx = self._get_zoom_table_idx(winner_ix) if self.zoom else winner_ix
+        self.winner_in_hands.append(idx)
 
         log.info(f"Player {winner_ix} won: {winning_card_type}")
 
@@ -838,6 +874,8 @@ class PlayerCycle:
             log.debug("Only one active player")
 
         while True:
+            log.debug(f"Can still make moves? {self.can_still_make_moves_in_this_hand[self.idx]}")
+            log.debug(f"Stack size: {self.lst[self.idx].stack}")
             if self.can_still_make_moves_in_this_hand[self.idx] and self.lst[self.idx].stack > 0:
                 # this should only include players who haven't folded with non-zero stacks
                 log.debug(f"Player stack: {self.lst[self.idx].stack}")
