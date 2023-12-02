@@ -91,7 +91,7 @@ class HoldemTable(Env):
         self.render_switch = render
         self.players = []
         self.table_cards = None
-        self.dealer_pos = -1
+        self.dealer_pos = None
         self.player_status = []  # one hot encoded
         self.current_player = None
         self.player_cycle = None  # cycle iterator
@@ -169,19 +169,17 @@ class HoldemTable(Env):
         self.first_action_for_hand = [True] * len(self.players)
         self.num_hands_session = 0
 
-        for player in self.players:
-            player.stack = self.initial_stacks
-
-        if not self.zoom:
-            # only reset dealer if zoom table is not being simulated
-            self.dealer_pos = -1
+        self.dealer_pos = 0
 
         self.player_cycle = PlayerCycle(
             self.players,
-            dealer_idx=self.dealer_pos,
+            dealer_idx=self.dealer_pos - 1,
             max_steps_after_raiser=len(self.players) - 1,
             max_steps_after_big_blind=len(self.players)
         )
+
+        for player in self.players:
+            player.stack = self.initial_stacks
 
         if self.zoom:
             # if this is a zoom table, resample all the bots
@@ -467,6 +465,9 @@ class HoldemTable(Env):
             player.cards = []
             player.actions = []
 
+        if self.zoom and self.num_hands_session > 1:
+            self._resample_zoom_table_bots()
+
         self._next_dealer()
 
         self._distribute_cards()
@@ -487,6 +488,8 @@ class HoldemTable(Env):
             player.agent_obj = deepcopy(self.bot_space[rand_idx[idx]])
             player.name = player.agent_obj.name
             log.info(f"Setting player {idx + 1} to {player.agent_obj.name} with stack ${player.stack}")
+
+        self.player_cycle.new_hand_reset()
 
     def _save_funds_history(self):
         """Keep track of player funds history."""

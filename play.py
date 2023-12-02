@@ -56,12 +56,16 @@ class SelfPlay:
             RandomPlayer(name='random_3')
         ]
 
-    def random_vs_equity_heads_up(self, call_equity: float, bet_equity: float) -> PlayLogger:
+    def random_vs_equity_heads_up(self, call_equity: float, bet_equity: float, max_num_of_hands: int = 1000) -> PlayLogger:
         """Simulate heads-up play between random and equity players.
 
         Args:
             call_equity: Minimum equity for equity player to call
             bet_equity: Minimum equity for equity player to bet
+            max_num_of_hands: Maximum number of hands per episode
+
+        Returns:
+            Play logger object
 
         """
         player = RandomPlayer()
@@ -79,6 +83,7 @@ class SelfPlay:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
+            max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo,
             terminate_if_main_player_lost=False
         )
@@ -93,13 +98,19 @@ class SelfPlay:
 
         return play_logger
 
-    def dqn_agent_vs_equity_heads_up(self, model_name: str, call_equity: float, bet_equity: float) -> PlayLogger:
+    def dqn_agent_vs_equity_heads_up(
+            self, model_name: str, call_equity: float, bet_equity: float, max_num_of_hands: int = 1000
+    ) -> PlayLogger:
         """Simulate heads-up play between DQN agent and equity players.
 
         Args:
             model_name: Name of model to load
             call_equity: Minimum equity for equity player to call
             bet_equity: Minimum equity for equity player to bet
+            max_num_of_hands: Maximum number of hands per episode
+
+        Returns:
+            Play logger object
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
@@ -117,6 +128,7 @@ class SelfPlay:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
+            max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo,
             terminate_if_main_player_lost=False
         )
@@ -129,13 +141,19 @@ class SelfPlay:
 
         return play_logger
 
-    def dqn_agent_vs_five_players(self, model_name: str, randomize_bots: bool = False, zoom: bool = False) -> PlayLogger:
+    def dqn_agent_vs_five_players(
+            self, model_name: str, max_num_of_hands: int = 1000, randomize_bots: bool = False, zoom: bool = False
+    ) -> PlayLogger:
         """Simulate play between DQN agent and five other players.
 
         Args:
             model_name: Name of model to load
+            max_num_of_hands: Maximum number of hands per episode
             randomize_bots: Whether to select random bots to play against
             zoom: Whether a zoom table should be simulated
+
+        Returns:
+            Play logger object
 
         """
         player = PlayerShell(name='keras-rl', stack_size=self.stack)
@@ -152,8 +170,6 @@ class SelfPlay:
                 EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7)
             ]
 
-        max_num_of_hands = 1 if zoom else 1000
-
         env = gym.make(
             ENV_NAME,
             player=player,
@@ -164,7 +180,7 @@ class SelfPlay:
             render=self.render,
             max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo,
-            terminate_if_main_player_lost=False,
+            terminate_if_main_player_lost=zoom,  # if zoom, restart if main player loses
             zoom=zoom,
             bot_space=self.bot_space
         )
@@ -198,7 +214,12 @@ def display_stats(play_logger: PlayLogger):
 
     # plot change in stacks
     plt.figure(figsize=(7, 5))
-    diff_stacks.cumsum().plot(use_index=False, ax=plt.gca())
+    ds = diff_stacks.cumsum()
+    for col in ds:
+        ds_col = ds[col].dropna().values
+        plt.plot(range(len(1, ds_col + 1)), ds_col, label=col)
+    plt.legend()
+    plt.grid()
 
     # plot players' actions
     for i in range(play_logger.env.num_of_players):
@@ -236,6 +257,7 @@ if __name__ == '__main__':
     )
     parser.add_argument("--model_name", help="DQN agent model name", type=str, default='dqn1')
     parser.add_argument("--num_episodes", help="Number of episodes to simulate", type=int, default=1)
+    parser.add_argument("--max_num_of_hands", help="Maximum number of hands per episode", type=int, default=1000)
     parser.add_argument("--stack", help="Initial stack", type=float, default=500)
     parser.add_argument("--small_blind", help="Small blind", type=float, default=2.5)
     parser.add_argument("--big_blind", help="Big blind", type=float, default=5)
@@ -268,10 +290,10 @@ if __name__ == '__main__':
     )
 
     if args.env_type == 'random_equity_HU':
-        play_logger = runner.random_vs_equity_heads_up(args.call_equity, args.bet_equity)
+        play_logger = runner.random_vs_equity_heads_up(args.call_equity, args.bet_equity, args.max_num_of_hands)
     elif args.env_type == 'dqn_agent_equity_HU':
-        play_logger = runner.dqn_agent_vs_equity_heads_up(args.model_name, args.call_equity, args.bet_equity)
+        play_logger = runner.dqn_agent_vs_equity_heads_up(args.model_name, args.call_equity, args.bet_equity, args.max_num_of_hands)
     else:
-        play_logger = runner.dqn_agent_vs_five_players(args.model_name, args.randomize_bots, args.zoom)
+        play_logger = runner.dqn_agent_vs_five_players(args.model_name, args.max_num_of_hands, args.randomize_bots, args.zoom)
 
     display_stats(play_logger)
