@@ -10,7 +10,7 @@ import numpy as np
 
 from agents.agent_consider_equity import Player as EquityPlayer
 from agents.agent_keras_rl_dqn import Player as DQNPlayer
-from agents.agent_random import Player as RandomPlayer
+from agents.agent_random import RandomPlayer2 as RandomPlayer
 from gym_env.env import PlayerShell
 from tools.helper import get_config
 from tools.helper import init_logger
@@ -44,9 +44,9 @@ class Trainer:
             EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
             EquityPlayer(name='equity/40/60', min_call_equity=0.4, min_bet_equity=0.6),
             EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
-            RandomPlayer(),
-            RandomPlayer(),
-            RandomPlayer()
+            RandomPlayer(name='random_1'),
+            RandomPlayer(name='random_2'),
+            RandomPlayer(name='random_3')
         ]
 
     def dqn_train_equity_HU(
@@ -57,6 +57,7 @@ class Trainer:
             nb_steps: int,
             nb_max_start_steps: int,
             nb_steps_warmup: int,
+            max_num_of_hands: int = 1000,
             resume: Optional[bool] = False
     ):
         """Train a DQN model against an equity player in heads-up play.
@@ -68,6 +69,7 @@ class Trainer:
             nb_steps: Number of steps to simulate in training
             nb_max_start_steps: Maximum number of random steps to take at the beginning
             nb_steps_warmup: Number of warmup steps to take
+            max_num_of_hands: Maximum number of hands per episode
             resume: Whether to resume an existing training
 
         """
@@ -86,6 +88,7 @@ class Trainer:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
+            max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo
         )
 
@@ -108,6 +111,7 @@ class Trainer:
             nb_steps: int,
             nb_max_start_steps: int,
             nb_steps_warmup: int,
+            max_num_of_hands: int = 1000,
             resume: Optional[bool] = False,
             zoom: Optional[bool] = False
     ):
@@ -118,6 +122,7 @@ class Trainer:
             nb_steps: Number of steps to simulate in training
             nb_max_start_steps: Maximum number of random steps to take at the beginning
             nb_steps_warmup: Number of warmup steps to take
+            max_num_of_hands: Maximum number of hands per episode
             resume: Whether to resume an existing training
             zoom: Whether a zoom table should be simulated
 
@@ -144,6 +149,7 @@ class Trainer:
             small_blind=self.small_blind,
             big_blind=self.big_blind,
             render=self.render,
+            max_num_of_hands=max_num_of_hands,
             use_cpp_montecarlo=self.use_cpp_montecarlo,
             zoom=zoom,
             bot_space=self.bot_space
@@ -174,6 +180,7 @@ if __name__ == '__main__':
         required=True
     )
     parser.add_argument("--model_name", help="DQN agent model name", type=str, default='dqn1')
+    parser.add_argument("--max_num_of_hands", help="Maximum number of hands per episode", type=int, default=1000)
     parser.add_argument("--stack", help="Initial stack", type=float, default=500)
     parser.add_argument("--small_blind", help="Small blind", type=float, default=2.5)
     parser.add_argument("--big_blind", help="Big blind", type=float, default=5)
@@ -215,6 +222,7 @@ if __name__ == '__main__':
             args.nb_steps,
             args.nb_max_start_steps,
             args.nb_steps_warmup,
+            args.max_num_of_hands,
             args.resume
         )
     else:
@@ -223,6 +231,7 @@ if __name__ == '__main__':
             args.nb_steps,
             args.nb_max_start_steps,
             args.nb_steps_warmup,
+            args.max_num_of_hands,
             args.resume,
             args.zoom
         )

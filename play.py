@@ -11,7 +11,7 @@ import pandas as pd
 
 from agents.agent_consider_equity import Player as EquityPlayer
 from agents.agent_keras_rl_dqn import Player as DQNPlayer
-from agents.agent_random import Player as RandomPlayer
+from agents.agent_random import RandomPlayer2 as RandomPlayer
 from gym_env.action import ActionBlind
 from gym_env.env import PlayerShell
 from gym_env.logger import PlayLogger
@@ -217,7 +217,7 @@ def display_stats(play_logger: PlayLogger):
     ds = diff_stacks.cumsum()
     for col in ds:
         ds_col = ds[col].dropna().values
-        plt.plot(range(len(1, ds_col + 1)), ds_col, label=col)
+        plt.plot(range(1, len(ds_col) + 1), ds_col, label=col)
     plt.legend()
     plt.grid()
 

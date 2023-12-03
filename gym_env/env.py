@@ -51,6 +51,7 @@ class HoldemTable(Env):
             max_num_of_hands: int = 1000,
             use_cpp_montecarlo: bool = False,
             terminate_if_main_player_lost: bool = True,
+            terminate_if_main_player_folds: bool = False,
             normalize_pot_values: bool = True,
             zoom: bool = False,
             min_zoom_table_stack = 250,
@@ -69,6 +70,7 @@ class HoldemTable(Env):
             max_num_of_hands: Maximum number of hands per episode
             use_cpp_montecarlo: Whether to use C++ version of Monte Carlo simulator
             terminate_if_main_player_lost: Whether to end the game if the main player has no more funds
+            terminate_if_main_player_folds: Whether to end the game if the main player folds (should only be used in zoom table)
             normalize_pot_values: Whether to normalize pot values by big blind when saving history
             zoom: Whether a zoom table should be simulated
             min_zoom_table_stack: Minimum stack for zoom table bots
@@ -113,6 +115,7 @@ class HoldemTable(Env):
         self.winner_in_episodes = None
         self.initial_stacks = initial_stacks
         self.terminate_if_main_player_lost = terminate_if_main_player_lost
+        self.terminate_if_main_player_folds = terminate_if_main_player_folds
 
         # pots
         self.community_pot = 0
@@ -678,7 +681,11 @@ class HoldemTable(Env):
         log.debug(f"Min call = {self.min_call}")
         log.debug(f"Player pots = {self.player_pots}")
 
-        self.current_player = self.player_cycle.next_player(self.player_pots, self.min_call)
+        if self.terminate_if_main_player_folds and self.player_cycle.folder[0]:
+            # main player has folded, so terminate round prematurely
+            self.current_player = False
+        else:
+            self.current_player = self.player_cycle.next_player(self.player_pots, self.min_call)
 
         if not self.current_player:
             if sum(self.player_cycle.alive) < 2:
