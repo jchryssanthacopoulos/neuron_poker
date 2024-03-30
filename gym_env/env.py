@@ -540,7 +540,7 @@ class HoldemTable(Env):
 
         remaining_players = sum(player_alive)
         if remaining_players < 2:
-            idx = self._get_zoom_table_idx(self.winner_ix) if self.zoom else self.winner_idx
+            idx = self._get_zoom_table_idx(self.winner_ix) if self.zoom else self.winner_ix
             self.winner_in_episodes.append(idx)
             self._game_over()
             return True
