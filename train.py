@@ -39,11 +39,11 @@ class Trainer:
         self.log = logging.getLogger(__name__)
 
         self.bot_space = [
-            EquityPlayer(name='equity/10/30', min_call_equity=0.1, min_bet_equity=0.3),
-            EquityPlayer(name='equity/20/40', min_call_equity=0.2, min_bet_equity=0.4),
-            EquityPlayer(name='equity/30/50', min_call_equity=0.3, min_bet_equity=0.5),
-            EquityPlayer(name='equity/40/60', min_call_equity=0.4, min_bet_equity=0.6),
-            EquityPlayer(name='equity/50/70', min_call_equity=0.5, min_bet_equity=0.7),
+            EquityPlayer(name='equity/30/50', min_call_equity=0.30, min_bet_equity=0.50),
+            EquityPlayer(name='equity/35/55', min_call_equity=0.35, min_bet_equity=0.55),
+            EquityPlayer(name='equity/40/60', min_call_equity=0.40, min_bet_equity=0.60),
+            EquityPlayer(name='equity/45/65', min_call_equity=0.45, min_bet_equity=0.65),
+            EquityPlayer(name='equity/50/70', min_call_equity=0.50, min_bet_equity=0.70),
             RandomPlayer(name='random_1'),
             RandomPlayer(name='random_2'),
             RandomPlayer(name='random_3')
